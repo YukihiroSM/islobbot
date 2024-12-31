@@ -93,6 +93,7 @@ class Training(Base):
     training_discomfort = Column(Integer, nullable=True)
     stress_on_next_day = Column(Integer, nullable=True)
     soreness_on_next_day = Column(Boolean, nullable=True)
+    canceled = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="trainings")
 

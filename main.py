@@ -22,7 +22,7 @@ from db_utils import (
     update_user_full_name,
     is_user_ready_to_use,
     get_user_notification_by_time,
-    toggle_user_notification,
+    toggle_user_notification, start_user_training, stop_training,
 )
 from keyboards import main_menu_keyboard
 from models import NotificationType
@@ -57,6 +57,7 @@ def is_valid_time(time_str: str) -> bool:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_session = next(get_db())
+    context.user_data["menu_state"] = "starting_using_bot"
     is_new_user = add_or_update_user(
         update.effective_user.id, update.effective_user.username, db_session
     )
@@ -227,6 +228,120 @@ async def change_user_notification_time(update, context):
         await update.message.reply_text("Помилка: не вдалось знайти сповіщення.")
 
 
+async def training_menu(update, context):
+    context.user_data["menu_state"] = "training_menu"
+    await update.message.reply_text(
+        "Час поглянути на тренування!",
+        reply_markup=keyboards.training_menu_keyboard()
+    )
+
+async def handle_training_startup(update, context):
+    context.user_data["menu_state"] = "training_start"
+    await update.message.reply_text(
+        "Ура ура! Розпочинаємо тренування!"
+        "Почнемо з невеличкого опитування."
+        "Як ти себе почуваєш? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
+        reply_markup=keyboards.training_first_question_marks_keyboard()
+    )
+
+
+async def handle_training_timer_start(update, context):
+    context.user_data["menu_state"] = "training_start_timer_start"
+    user_input = update.message.text
+    if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        context.user_data["menu_state"] = "training_start"
+        await update.message.reply_text(
+            "Як ти себе почуваєш? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
+            reply_markup=keyboards.training_first_question_marks_keyboard()
+        )
+        return
+    db_session = next(get_db())
+
+    training_id = start_user_training(
+        chat_id=update.effective_chat.id,
+        user_state_mark=user_input,
+        db_session=db_session
+    )
+    if not training_id:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)"
+        )
+        await training_menu(update, context)
+    else:
+        context.user_data["training_id"] = training_id
+        await update.message.reply_text(
+            "Го го го!! Успіхів у тренуванні, тренування розпочато!",
+            reply_markup=keyboards.training_in_progress_keyboard()
+        )
+
+
+
+async def handle_training_stop(update, context):
+    context.user_data["menu_state"] = "training_stopped"
+    if "training_id" not in context.user_data:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)"
+        )
+        await training_menu(update, context)
+        return
+    update.message.reply_text(
+        "Супер! Ти справився! Давай оцінимо сьогоднішнє тренування:"
+        "Оціни, наскільки важке було тренування?",
+        reply_markup=keyboards.training_first_question_marks_keyboard()
+    )
+
+
+async def handle_training_second_question(update, context):
+    context.user_data["menu_state"] = "training_stopped_second_question"
+    user_input = update.message.text
+    if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        context.user_data["menu_state"] = "training_stopped"
+        await update.message.reply_text(
+            "Оціни, наскільки важке було тренування? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
+            reply_markup=keyboards.training_first_question_marks_keyboard()
+        )
+        return
+    context.user_data["training_stop_first_question"] = user_input
+    update.message.reply_text(
+        "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
+        reply_markup=keyboards.training_first_question_marks_keyboard()
+    )
+
+
+async def handle_training_finish(update, context):
+    context.user_data["menu_state"] = "training_stopped_finish"
+    user_input = update.message.text
+    if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        context.user_data["menu_state"] = "training_stopped_second_question"
+        await update.message.reply_text(
+            "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
+            reply_markup=keyboards.training_first_question_marks_keyboard()
+        )
+        return
+    training_discomfort = user_input
+    training_hardness = context.user_data["training_stop_first_question"]
+    training_id = context.user_data["training_id"]
+
+    db_session = next(get_db())
+    training_duration = stop_training(
+        training_id=training_id,
+        training_hardness=training_hardness,
+        training_discomfort=training_discomfort,
+        db_session=db_session
+    )
+    context.bot.send_message(
+        text=f"Супер! Ти тренувався аж {training_duration}! Тепер час відпочити)",
+        chat_id=update.effective_chat.id
+    )
+    await training_menu(update, context)
+
+
+async def cancel_recent_training(update, context):
+    return
+
+
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
 
@@ -234,9 +349,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await main_menu(update, context)
 
     # main menu handling
-    if user_input == text_constants.START_TRAINING:
-        context.user_data["menu_state"] = "start_training"
-        await update.message.reply_text("Starting training")
+    if user_input == text_constants.TRAINING:
+        await training_menu(update, context)
 
     if user_input == text_constants.SETTINGS:
         await settings_menu(update, context)
@@ -263,7 +377,46 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_input == text_constants.CHANGE_NOTIFICATION_TIME:
         await notification_time_change_menu(update, context)
 
+    #training menu handling
+
+    if context.user_data["menu_state"] == "training_menu" and user_input == text_constants.START_TRAINING:
+        await handle_training_startup(update, context)
+
+    if context.user_data["menu_state"] == "training_start":
+        if user_input == text_constants.CANCEL_TRAINING:
+            await cancel_recent_training(update, context)
+            await training_menu(update, context)
+        else:
+            await handle_training_timer_start(update, context)
+
+    if context.user_data["menu_state"] == "training_start_timer_start":
+        if user_input == text_constants.CANCEL_TRAINING:
+            await cancel_recent_training(update, context)
+            await training_menu(update, context)
+        elif user_input == text_constants.END_TRAINING:
+            await handle_training_stop(update, context)
+
+    if context.user_data["menu_state"] == "training_stopped":
+        if user_input == text_constants.CANCEL_TRAINING:
+            await cancel_recent_training(update, context)
+            await training_menu(update, context)
+        else:
+            await handle_training_second_question(update, context)
+
+    if context.user_data["menu_state"] == "training_stopped_second_question":
+        if user_input == text_constants.CANCEL_TRAINING:
+            await cancel_recent_training(update, context)
+            await training_menu(update, context)
+        else:
+            await handle_training_finish(update, context)
+
+    if context.user_data["menu_state"] == "training_stopped_finish":
+        if user_input == text_constants.CANCEL_TRAINING:
+            await cancel_recent_training(update, context)
+            await training_menu(update, context)
+
     # handle anything else
+
     if context.user_data["menu_state"] == "switch_notifications":
         await handle_notification_toggle(update, context)
 
@@ -272,6 +425,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await change_user_notification_time(update, context)
         else:
             await handle_notification_time_change(update, context)
+
+    return
 
 
 if __name__ == "__main__":
@@ -291,7 +446,8 @@ if __name__ == "__main__":
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
+
     app.add_handler(intro_conv_handler)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
 
     app.run_polling()

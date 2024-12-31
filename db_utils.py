@@ -4,9 +4,10 @@ from models import (
     UserRole,
     User,
     NotificationPreference,
-    NotificationType,
+    NotificationType, Training,
 )
 from exceptions import UserNotFoundError
+import datetime
 
 
 def add_or_update_user(chat_id: int, username: str, db: Session):
@@ -86,12 +87,14 @@ def save_user_notification_preference(
     )
     if notification_preference:
         notification_preference.notification_time = notification_time
+        notification_preference.is_active = True
         is_created = False
     else:
         notification_preference = NotificationPreference(
             user_id=user.id,
             notification_type=notification_type,
             notification_time=notification_time,
+            is_active=True
         )
         db_session.add(notification_preference)
         is_created = True
@@ -140,3 +143,43 @@ def toggle_user_notification(notification_id: int, db_session: Session):
     )
     notification.is_active = not notification.is_active
     db_session.commit()
+
+
+def start_user_training(chat_id: int, user_state_mark: str, db_session: Session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    if not user:
+        raise UserNotFoundError(chat_id)
+
+    training = Training(
+        user=user,
+        mark_before_training=user_state_mark,
+        training_start_date=datetime.datetime.now(),
+        training_finish_date=None,
+        training_duration=None,
+        training_hardness=None,
+        training_discomfort=None,
+        stress_on_next_day=None,
+        soreness_on_next_day=None,
+        canceled=False
+    )
+
+    db_session.add(training)
+    db_session.commit()
+    return training.id
+
+
+def cancel_training(training_id: int, db_session: Session):
+    training = db_session.query(Training).filter_by(id=training_id).first()
+    if training:
+        training.canceled = True
+
+
+def stop_training(training_id: int, training_hardness: str, training_discomfort: str, db_session: Session):
+    training = db_session.query(Training).filter_by(id=training_id, canceled=False).first()
+    if training:
+        training.training_finish_date = datetime.datetime.now()
+        training.training_duration = training.training_finish_date - training.training_start_date
+        training.training_hardness = training_hardness
+        training.training_discomfort = training_discomfort
+        db_session.commit()
+        return training.training_duration

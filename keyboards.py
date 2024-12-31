@@ -6,7 +6,7 @@ from db_utils import get_user_notifications
 
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
-        [[text_constants.START_TRAINING, text_constants.SETTINGS]],
+        [[text_constants.TRAINING, text_constants.SETTINGS]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
@@ -52,3 +52,39 @@ def get_notifications_keyboard(chat_id: int):
     buttons.append(text_constants.GO_BACK)
 
     return ReplyKeyboardMarkup([buttons], resize_keyboard=True, one_time_keyboard=True)
+
+
+def training_menu_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            [
+                text_constants.START_TRAINING,
+            ],
+            [text_constants.GO_BACK],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def training_first_question_marks_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            [str(i) for i in range(1, 6)],
+            [str(i) for i in range(6, 11)],
+            [text_constants.CANCEL_TRAINING]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+def training_in_progress_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            [text_constants.END_TRAINING],
+            [text_constants.CANCEL_TRAINING],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
