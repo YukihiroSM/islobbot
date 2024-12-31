@@ -66,17 +66,11 @@ class User(Base):
     )
 
     trainings = relationship(
-        "Training",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        uselist=True
+        "Training", back_populates="user", cascade="all, delete-orphan", uselist=True
     )
 
     morning_quizzes = relationship(
-        "MorningQuiz",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        uselist=True
+        "MorningQuiz", back_populates="user", cascade="all, delete-orphan", uselist=True
     )
 
 

@@ -22,7 +22,9 @@ from db_utils import (
     update_user_full_name,
     is_user_ready_to_use,
     get_user_notification_by_time,
-    toggle_user_notification, start_user_training, stop_training,
+    toggle_user_notification,
+    start_user_training,
+    stop_training,
 )
 from keyboards import main_menu_keyboard
 from models import NotificationType
@@ -231,9 +233,9 @@ async def change_user_notification_time(update, context):
 async def training_menu(update, context):
     context.user_data["menu_state"] = "training_menu"
     await update.message.reply_text(
-        "Час поглянути на тренування!",
-        reply_markup=keyboards.training_menu_keyboard()
+        "Час поглянути на тренування!", reply_markup=keyboards.training_menu_keyboard()
     )
+
 
 async def handle_training_startup(update, context):
     context.user_data["menu_state"] = "training_start"
@@ -241,7 +243,7 @@ async def handle_training_startup(update, context):
         "Ура ура! Розпочинаємо тренування!"
         "Почнемо з невеличкого опитування."
         "Як ти себе почуваєш? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
-        reply_markup=keyboards.training_first_question_marks_keyboard()
+        reply_markup=keyboards.training_first_question_marks_keyboard(),
     )
 
 
@@ -252,7 +254,7 @@ async def handle_training_timer_start(update, context):
         context.user_data["menu_state"] = "training_start"
         await update.message.reply_text(
             "Як ти себе почуваєш? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
-            reply_markup=keyboards.training_first_question_marks_keyboard()
+            reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
     db_session = next(get_db())
@@ -260,21 +262,20 @@ async def handle_training_timer_start(update, context):
     training_id = start_user_training(
         chat_id=update.effective_chat.id,
         user_state_mark=user_input,
-        db_session=db_session
+        db_session=db_session,
     )
     if not training_id:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)"
+            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)",
         )
         await training_menu(update, context)
     else:
         context.user_data["training_id"] = training_id
         await update.message.reply_text(
             "Го го го!! Успіхів у тренуванні, тренування розпочато!",
-            reply_markup=keyboards.training_in_progress_keyboard()
+            reply_markup=keyboards.training_in_progress_keyboard(),
         )
-
 
 
 async def handle_training_stop(update, context):
@@ -282,14 +283,14 @@ async def handle_training_stop(update, context):
     if "training_id" not in context.user_data:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)"
+            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)",
         )
         await training_menu(update, context)
         return
     update.message.reply_text(
         "Супер! Ти справився! Давай оцінимо сьогоднішнє тренування:"
         "Оціни, наскільки важке було тренування?",
-        reply_markup=keyboards.training_first_question_marks_keyboard()
+        reply_markup=keyboards.training_first_question_marks_keyboard(),
     )
 
 
@@ -300,13 +301,13 @@ async def handle_training_second_question(update, context):
         context.user_data["menu_state"] = "training_stopped"
         await update.message.reply_text(
             "Оціни, наскільки важке було тренування? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
-            reply_markup=keyboards.training_first_question_marks_keyboard()
+            reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
     context.user_data["training_stop_first_question"] = user_input
     update.message.reply_text(
         "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
-        reply_markup=keyboards.training_first_question_marks_keyboard()
+        reply_markup=keyboards.training_first_question_marks_keyboard(),
     )
 
 
@@ -317,7 +318,7 @@ async def handle_training_finish(update, context):
         context.user_data["menu_state"] = "training_stopped_second_question"
         await update.message.reply_text(
             "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
-            reply_markup=keyboards.training_first_question_marks_keyboard()
+            reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
     training_discomfort = user_input
@@ -329,11 +330,11 @@ async def handle_training_finish(update, context):
         training_id=training_id,
         training_hardness=training_hardness,
         training_discomfort=training_discomfort,
-        db_session=db_session
+        db_session=db_session,
     )
     context.bot.send_message(
         text=f"Супер! Ти тренувався аж {training_duration}! Тепер час відпочити)",
-        chat_id=update.effective_chat.id
+        chat_id=update.effective_chat.id,
     )
     await training_menu(update, context)
 
@@ -377,9 +378,12 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_input == text_constants.CHANGE_NOTIFICATION_TIME:
         await notification_time_change_menu(update, context)
 
-    #training menu handling
+    # training menu handling
 
-    if context.user_data["menu_state"] == "training_menu" and user_input == text_constants.START_TRAINING:
+    if (
+        context.user_data["menu_state"] == "training_menu"
+        and user_input == text_constants.START_TRAINING
+    ):
         await handle_training_startup(update, context)
 
     if context.user_data["menu_state"] == "training_start":

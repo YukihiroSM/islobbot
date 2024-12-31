@@ -72,7 +72,7 @@ def training_first_question_marks_keyboard():
         [
             [str(i) for i in range(1, 6)],
             [str(i) for i in range(6, 11)],
-            [text_constants.CANCEL_TRAINING]
+            [text_constants.CANCEL_TRAINING],
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
