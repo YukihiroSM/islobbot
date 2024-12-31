@@ -165,8 +165,7 @@ async def handle_notification_toggle(update, context):
 
     toggle_user_notification(notification_id=notification.id, db_session=db_session)
     await context.bot.send_message(
-        chat_id=update.effective_user.id,
-        text="Налаштування успішно застосовано!"
+        chat_id=update.effective_user.id, text="Налаштування успішно застосовано!"
     )
     await switch_notifications(update, context)
 
@@ -175,7 +174,7 @@ async def notification_time_change_menu(update, context):
     context.user_data["menu_state"] = "change_notification_time"
     await update.message.reply_text(
         "Натисніть на сповіщення, щоб змінити його час спрацювання:",
-        reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id)
+        reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
     )
 
 
@@ -220,7 +219,8 @@ async def change_user_notification_time(update, context):
             db_session=db_session,
         )
         await update.message.reply_text(
-            "Час сповіщення успішно оновлено!", reply_markup=keyboards.notification_configuration_keyboard()
+            "Час сповіщення успішно оновлено!",
+            reply_markup=keyboards.notification_configuration_keyboard(),
         )
         del context.user_data["notification_to_change"]
     else:
