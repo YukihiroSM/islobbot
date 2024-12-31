@@ -64,3 +64,46 @@ class User(Base):
         cascade="all, delete-orphan",
         uselist=True,
     )
+
+    trainings = relationship(
+        "Training",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=True
+    )
+
+    morning_quizzes = relationship(
+        "MorningQuiz",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=True
+    )
+
+
+class Training(Base):
+    __tablename__ = "user_training"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    mark_before_training = Column(Integer, nullable=False)
+    training_start_date = Column(DateTime, nullable=True)
+    training_finish_date = Column(DateTime, nullable=True)
+    training_duration = Column(Time, nullable=True)
+    training_hardness = Column(Integer, nullable=True)
+    training_discomfort = Column(Integer, nullable=True)
+    stress_on_next_day = Column(Integer, nullable=True)
+    soreness_on_next_day = Column(Boolean, nullable=True)
+
+    user = relationship("User", back_populates="trainings")
+
+
+class MorningQuiz(Base):
+    __tablename__ = "user_morning_quiz"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quiz_datetime = Column(DateTime, nullable=False)
+    user_feelings = Column(Integer, nullable=False)
+    user_feelings_comment = Column(String, nullable=True)
+    user_sleeping_hours = Column(Integer, nullable=False)
+
+    user = relationship("User", back_populates="morning_quizzes")
