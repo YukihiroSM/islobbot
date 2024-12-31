@@ -6,6 +6,9 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
 )
 
 from bot_utils import payment_restricted
@@ -14,180 +17,202 @@ from database import get_db
 from db_utils import (
     add_or_update_user,
     get_user_notifications,
-    save_user_notification_preference, update_user_notification_time,
+    save_user_notification_preference,
+    update_user_notification_time,
+    update_user_full_name,
+    is_user_ready_to_use,
+    get_user_notification_by_time,
+    toggle_user_notification,
 )
+from keyboards import main_menu_keyboard
 from models import NotificationType
 import text_constants
+from enum import Enum, auto
+import re
+import logging
+import datetime
+import keyboards
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+class IntroConversation(Enum):
+    NEW_COMER = auto()
+    GET_NAME = auto()
+    GET_TIME = auto()
+
+
+def is_valid_time(time_str: str) -> bool:
+    match = re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", time_str)
+    min_time = datetime.time(hour=6)
+    max_time = datetime.time(hour=12)
+
+    time = datetime.datetime.strptime(time_str, "%H:%M").time()
+    if time < min_time or time > max_time:
+        return False
+    return bool(match)
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_session = next(get_db())
-    is_new_user = add_or_update_user(update.effective_user.id, update.effective_user.username, db_session)
-    if is_new_user:
-        await new_comer(update, context)
-    else:
-        keyboard = [
-            [InlineKeyboardButton(text_constants.START_TRAINING, callback_data="start_training")],
-            [InlineKeyboardButton(text_constants.SETTINGS, callback_data="settings_menu")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    is_new_user = add_or_update_user(
+        update.effective_user.id, update.effective_user.username, db_session
+    )
 
+    if is_new_user or not is_user_ready_to_use(update.effective_user.id, db_session):
+        await update.message.reply_text(
+            "Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
+        )
+        await update.message.reply_text("Для початку, введіть своє повне ім'я.")
+        return IntroConversation.GET_NAME
+    else:
         await update.message.reply_text(
             f"Привіт, {update.effective_user.username}!",
-            reply_markup=reply_markup,
+            reply_markup=main_menu_keyboard(),
         )
-    context.user_data["current_menu"] = "main_menu"
 
 
-async def new_comer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def get_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.message.text
+    db_session = next(get_db())
+    update_user_full_name(
+        chat_id=update.effective_chat.id, full_name=name, db=db_session
+    )
+    await update.message.reply_text(
+        f"Дякую, {name}! Тепер налаштуємо сповіщення. Введіть бажаний час для ранкового сповіщення. "
+        f"Його потрібно увести в форматі '08:00'. "
+        f"Введіть будь-який зручний час в рамках від 06:00 до 12:00! ",
+    )
+    return IntroConversation.GET_TIME
+
+
+async def get_morning_notification_time(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+    time_input = update.message.text
+    if is_valid_time(time_input):
+        db_session = next(get_db())
+        save_user_notification_preference(
+            chat_id=update.effective_user.id,
+            notification_type=NotificationType.MORNING_NOTIFICATION,
+            notification_time=time_input,
+            db_session=db_session,
+        )
+        await update.message.reply_text(
+            "Супер! Налаштування завершено!", reply_markup=main_menu_keyboard()
+        )
+        return ConversationHandler.END
+    else:
+        await update.message.reply_text(
+            f"Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
+        )
+        return IntroConversation.GET_TIME
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Операція зупинена.", reply_markup=main_menu_keyboard()
+    )
+
+    return ConversationHandler.END
+
+
+async def settings_menu(update, context):
+    context.user_data["menu_state"] = "settings_menu"
+    await update.message.reply_text(
+        "Меню налаштувань. Оберіть, що ви бажаєте налаштувати:",
+        reply_markup=keyboards.settings_menu_keyboard(),
+    )
+
+
+async def configure_notifications_menu(update, context):
+    context.user_data["menu_state"] = "notifications_menu"
+    await update.message.reply_text(
+        "Конфігурація сповіщень. Оберіть, що бажаєте налаштувати:",
+        reply_markup=keyboards.notification_configuration_keyboard(),
+    )
+
+
+async def main_menu(update, context):
+    context.user_data["menu_state"] = "main_menu"
+    await update.message.reply_text(
+        "Головне меню:", reply_markup=keyboards.main_menu_keyboard()
+    )
+
+
+async def switch_notifications(update, context):
+    context.user_data["menu_state"] = "switch_notifications"
+    await update.message.reply_text(
+        "Натисніть на сповіщення, щоб увімкнути / вимкнути:",
+        reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
+    )
+
+
+async def handle_notification_toggle(update, context):
+    user_input = update.message.text
+    db_session = next(get_db())
+    notification_time_string = user_input.split(" - ")[0]
+    notification = get_user_notification_by_time(
+        chat_id=update.effective_user.id,
+        time=notification_time_string,
+        db_session=db_session,
+    )
+    toggle_user_notification(notification_id=notification.id, db_session=db_session)
     await context.bot.send_message(
         chat_id=update.effective_user.id,
-        text="Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
+        text="Налаштування успішно застосовано!"
     )
-
-    keyboard = [
-        [InlineKeyboardButton(f"{hour:02d}:{minute:02d}", callback_data=f"new_time_{hour:02d}:{minute:02d}")]
-        for hour in range(8, 13) for minute in (0, 30)
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await update.message.reply_text(
-        f"Налаштуємо сповіщення. Оберіть бажаний час для ранкового повідомлення: ",
-        reply_markup=reply_markup,
-    )
+    await switch_notifications(update, context)
 
 
-@payment_restricted
-async def save_new_notification_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Save the updated notification time."""
-    query = update.callback_query
-    await query.answer()
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
 
-    new_time = query.data.split("_")[2]
+    # main menu handling
+    if user_input == text_constants.START_TRAINING:
+        context.user_data["menu_state"] = "start_training"
+        await update.message.reply_text("Starting training")
 
-    db_session = next(get_db())
-    save_user_notification_preference(
-        chat_id=update.effective_user.id,
-        notification_type=NotificationType.MORNING_NOTIFICATION,
-        notification_time=new_time,
-        db_session=db_session
-    )
-    await main_menu(update, context)
+    if user_input == text_constants.SETTINGS:
+        await settings_menu(update, context)
 
+    # settings menu handling
 
-@payment_restricted
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Display the main menu."""
-    query = update.callback_query
-    await query.answer()
+    if user_input == text_constants.GO_BACK:
+        if context.user_data["menu_state"] == "settings_menu":
+            await main_menu(update, context)
+        if context.user_data["menu_state"] == "notifications_menu":
+            await settings_menu(update, context)
+        if context.user_data["menu_state"] == "switch_notifications":
+            await configure_notifications_menu(update, context)
 
-    keyboard = [
-        [InlineKeyboardButton(text_constants.START_TRAINING, callback_data="start_training")],
-        [InlineKeyboardButton(text_constants.SETTINGS, callback_data="settings_menu")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    if user_input == text_constants.CONFIGURE_NOTIFICATIONS:
+        await configure_notifications_menu(update, context)
 
-    await query.edit_message_text("Головне меню:", reply_markup=reply_markup)
+    # Notifications config menu
+    if user_input == text_constants.TURN_ON_OFF_NOTIFICATIONS:
+        await switch_notifications(update, context)
 
-
-@payment_restricted
-async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Display the settings menu."""
-    query = update.callback_query
-    await query.answer()
-
-    keyboard = [
-        [InlineKeyboardButton(text_constants.CONFIGURE_NOTIFICATIONS, callback_data="configure_notifications")],
-        [InlineKeyboardButton(text_constants.GO_BACK, callback_data="main_menu")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text("Меню налаштувань:", reply_markup=reply_markup)
-
-
-@payment_restricted
-async def view_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Display the user's notifications."""
-    query = update.callback_query
-    await query.answer()
-
-    db_session = next(get_db())
-    user_id = update.effective_user.id
-
-    notifications = get_user_notifications(user_id, db_session)
-
-    if not notifications:
-        await query.edit_message_text("У вас ще немає налаштованих сповіщень!")
-        return
-
-    keyboard = [
-        [InlineKeyboardButton(f"{n.notification_type.value}: {n.notification_time}", callback_data=f"edit_{n.id}")]
-        for n in notifications
-    ]
-    keyboard.append([InlineKeyboardButton(text_constants.GO_BACK, callback_data="settings_menu")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text("Ваші сповіщення:", reply_markup=reply_markup)
-
-
-@payment_restricted
-async def update_notification_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Allow the user to update the time of a selected notification."""
-    query = update.callback_query
-    await query.answer()
-
-    notification_id = query.data.split("_")[1]
-    context.user_data["notification_id"] = notification_id
-
-    keyboard = [
-        [InlineKeyboardButton(f"{hour:02d}:{minute:02d}", callback_data=f"time_{hour:02d}:{minute:02d}")]
-        for hour in range(8, 13) for minute in (0, 30)
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text("Оберіть новий час:", reply_markup=reply_markup)
-
-
-@payment_restricted
-async def save_notification_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Save the updated notification time."""
-    query = update.callback_query
-    await query.answer()
-
-    new_time = query.data.split("_")[1]
-    notification_id = context.user_data.get("notification_id")
-
-    db_session = next(get_db())
-    update_user_notification_time(
-        notification_id=notification_id,
-        new_time=new_time,
-        db_session=db_session
-    )
-    await view_notifications(update, context)
-
-
-@payment_restricted
-async def start_training(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start the training process by asking initial questions."""
-    query = update.callback_query
-    await query.answer()
-
-    # Initialize training state
-    context.user_data["training_state"] = "asking_questions"
-    context.user_data["training_data"] = {}
-    await query.edit_message_text("Питання 1: Яка ваша головна мета для цього тренування?")
+    # handle anything else
+    await handle_notification_toggle(update, context)
 
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
-    app.add_handler(CallbackQueryHandler(settings_menu, pattern="^settings_menu$"))
-    app.add_handler(CallbackQueryHandler(view_notifications, pattern="^configure_notifications$"))
-    app.add_handler(CallbackQueryHandler(update_notification_time, pattern="^edit_.*$"))
-    app.add_handler(CallbackQueryHandler(save_notification_time, pattern="^time_.*$"))
-    app.add_handler(CallbackQueryHandler(save_new_notification_time, pattern="^new_time_.*$"))
-    app.add_handler(CallbackQueryHandler(start_training, pattern="^start_training$"))
+    intro_conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            IntroConversation.GET_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_user_name)
+            ],
+            IntroConversation.GET_TIME: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, get_morning_notification_time
+                )
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
+    app.add_handler(intro_conv_handler)
 
     app.run_polling()

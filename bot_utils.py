@@ -30,4 +30,5 @@ def admin_restricted(func):
             )
             return
         await func(update, context)
+
     return wrapper

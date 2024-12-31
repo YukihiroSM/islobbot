@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum, ForeignKey, Time, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Time,
+    UniqueConstraint,
+    Boolean,
+)
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -25,12 +35,13 @@ class NotificationPreference(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    notification_type = Column(
-        Enum(NotificationType), nullable=False
-    )
+    notification_type = Column(Enum(NotificationType), nullable=False)
     notification_time = Column(Time, nullable=False)
+    is_active = Column(Boolean, default=False)
     __table_args__ = (
-        UniqueConstraint("user_id", "notification_type", name="uq_user_notification_type"),
+        UniqueConstraint(
+            "user_id", "notification_type", name="uq_user_notification_type"
+        ),
     )
     user = relationship("User", back_populates="notification_preferences")
 
@@ -48,5 +59,8 @@ class User(Base):
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
 
     notification_preferences = relationship(
-        "NotificationPreference", back_populates="user", cascade="all, delete-orphan", uselist=True
+        "NotificationPreference",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=True,
     )
