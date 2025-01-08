@@ -1,22 +1,27 @@
-from datetime import datetime
+import datetime
+import logging
+import re
+from datetime import datetime, time as datetime_time
+from enum import Enum, auto
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from sqlalchemy.exc import DataError
+from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    CallbackQueryHandler,
     ContextTypes,
     ConversationHandler,
     MessageHandler,
     filters,
 )
 
-from bot_utils import payment_restricted
+import keyboards
+import text_constants
 from config import BOT_TOKEN
+from config import DATABASE_URL
 from database import get_db
 from db_utils import (
     add_or_update_user,
-    get_user_notifications,
     save_user_notification_preference,
     update_user_notification_time,
     update_user_full_name,
@@ -28,13 +33,16 @@ from db_utils import (
 )
 from keyboards import main_menu_keyboard
 from models import NotificationType
-import text_constants
-from enum import Enum, auto
-import re
-import logging
-import datetime
-import keyboards
-from sqlalchemy.exc import DataError
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 
 class IntroConversation(Enum):
@@ -43,17 +51,21 @@ class IntroConversation(Enum):
     GET_TIME = auto()
 
 
+class TrainingSteps(Enum):
+    pass
+
+
 def is_valid_time(time_str: str) -> bool:
     try:
         match = re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", time_str)
-        min_time = datetime.time(hour=6)
-        max_time = datetime.time(hour=12)
+        min_time = datetime_time(hour=6)
+        max_time = datetime_time(hour=12)
 
-        time = datetime.datetime.strptime(time_str, "%H:%M").time()
+        time = datetime.strptime(time_str, "%H:%M").time()
         if time < min_time or time > max_time:
             return False
         return bool(match)
-    except:
+    except Exception as e:
         return False
 
 
@@ -248,15 +260,14 @@ async def handle_training_startup(update, context):
 
 
 async def handle_training_timer_start(update, context):
-    context.user_data["menu_state"] = "training_start_timer_start"
     user_input = update.message.text
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
-        context.user_data["menu_state"] = "training_start"
         await update.message.reply_text(
             "Як ти себе почуваєш? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
             reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
+    context.user_data["menu_state"] = "training_start_timer_start"
     db_session = next(get_db())
 
     training_id = start_user_training(
@@ -279,7 +290,6 @@ async def handle_training_timer_start(update, context):
 
 
 async def handle_training_stop(update, context):
-    context.user_data["menu_state"] = "training_stopped"
     if "training_id" not in context.user_data:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -287,7 +297,8 @@ async def handle_training_stop(update, context):
         )
         await training_menu(update, context)
         return
-    update.message.reply_text(
+    context.user_data["menu_state"] = "training_stopped"
+    await update.message.reply_text(
         "Супер! Ти справився! Давай оцінимо сьогоднішнє тренування:"
         "Оціни, наскільки важке було тренування?",
         reply_markup=keyboards.training_first_question_marks_keyboard(),
@@ -295,32 +306,35 @@ async def handle_training_stop(update, context):
 
 
 async def handle_training_second_question(update, context):
-    context.user_data["menu_state"] = "training_stopped_second_question"
     user_input = update.message.text
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
-        context.user_data["menu_state"] = "training_stopped"
         await update.message.reply_text(
             "Оціни, наскільки важке було тренування? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
             reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
+    context.user_data["menu_state"] = "training_stopped_second_question"
     context.user_data["training_stop_first_question"] = user_input
-    update.message.reply_text(
+    await update.message.reply_text(
         "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
         reply_markup=keyboards.training_first_question_marks_keyboard(),
     )
 
 
 async def handle_training_finish(update, context):
-    context.user_data["menu_state"] = "training_stopped_finish"
+    logging.info("Inside handle_training_finish")
     user_input = update.message.text
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        logging.info("Incorrect input")
         context.user_data["menu_state"] = "training_stopped_second_question"
         await update.message.reply_text(
             "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
             reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return
+    logging.info("After input check")
+    logging.info(user_input)
+    context.user_data["menu_state"] = "training_stopped_finish"
     training_discomfort = user_input
     training_hardness = context.user_data["training_stop_first_question"]
     training_id = context.user_data["training_id"]
@@ -332,7 +346,7 @@ async def handle_training_finish(update, context):
         training_discomfort=training_discomfort,
         db_session=db_session,
     )
-    context.bot.send_message(
+    await context.bot.send_message(
         text=f"Супер! Ти тренувався аж {training_duration}! Тепер час відпочити)",
         chat_id=update.effective_chat.id,
     )
@@ -367,6 +381,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await configure_notifications_menu(update, context)
         if context.user_data["menu_state"] == "change_notification_time":
             await configure_notifications_menu(update, context)
+        if context.user_data["menu_state"] == "training_menu":
+            await main_menu(update, context)
 
     if user_input == text_constants.CONFIGURE_NOTIFICATIONS:
         await configure_notifications_menu(update, context)
