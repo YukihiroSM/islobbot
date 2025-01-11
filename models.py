@@ -37,6 +37,8 @@ class NotificationPreference(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     notification_type = Column(Enum(NotificationType), nullable=False)
     notification_time = Column(Time, nullable=False)
+    last_execution_datetime = Column(DateTime, nullable=True)
+    next_execution_datetime = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=False)
     __table_args__ = (
         UniqueConstraint(

@@ -1,14 +1,16 @@
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
 from models import (
     UserPaymentStatus,
     UserRole,
     User,
     NotificationPreference,
     NotificationType,
-    Training,
+    Training, MorningQuiz,
 )
 from exceptions import UserNotFoundError
 import datetime
+from config import timezone
 
 
 def add_or_update_user(chat_id: int, username: str, db: Session):
@@ -75,6 +77,7 @@ def save_user_notification_preference(
     chat_id: int,
     notification_type: NotificationType,
     notification_time: str,
+    next_execution_datetime,
     db_session: Session,
 ):
     user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
@@ -95,6 +98,7 @@ def save_user_notification_preference(
             user_id=user.id,
             notification_type=notification_type,
             notification_time=notification_time,
+            next_execution_datetime=next_execution_datetime,
             is_active=True,
         )
         db_session.add(notification_preference)
@@ -193,3 +197,67 @@ def stop_training(
         training.training_discomfort = training_discomfort
         db_session.commit()
         return training.training_duration
+
+
+def get_notifications_to_send_by_time(current_datetime, db_session: Session):
+    notification_preferences = db_session.scalars(
+        select(NotificationPreference)
+        .options(joinedload(NotificationPreference.user))
+        .where(
+            (NotificationPreference.next_execution_datetime <= current_datetime)
+            & (NotificationPreference.is_active.is_(True))
+        )
+    ).all()
+    return notification_preferences
+
+
+def update_user_notification_preference_next_execution(
+    last_execution_datetime,
+    next_execution_datetime,
+    notification_id,
+    db_session: Session,
+):
+    notification_preference = (
+        db_session.query(NotificationPreference).filter_by(id=notification_id).first()
+    )
+    notification_preference.last_execution_datetime = last_execution_datetime
+    notification_preference.next_execution_datetime = next_execution_datetime
+
+    db_session.commit()
+
+
+def save_morning_quiz_results(user_id, quiz_datetime, user_feelings, user_sleeping_hours, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(user_id)).first()
+    if not user:
+        raise UserNotFoundError(user_id)
+
+    morning_quiz = MorningQuiz(
+        user=user,
+        quiz_datetime=quiz_datetime,
+        user_feelings=user_feelings,
+        user_sleeping_hours=user_sleeping_hours,
+    )
+    db_session.add(morning_quiz)
+    db_session.commit()
+
+
+def is_user_had_morning_quiz_today(chat_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    if not user:
+        raise UserNotFoundError(chat_id)
+
+    today_start = datetime.datetime.combine(datetime.date.today(), datetime.datetime.min.time())
+    today_end = datetime.datetime.combine(datetime.date.today(), datetime.datetime.max.time())
+    print(today_start, today_end)
+    exists = db_session.query(
+        db_session.query(MorningQuiz)
+        .filter(
+            (MorningQuiz.user == user) &
+            (MorningQuiz.quiz_datetime >= today_start) &
+            (MorningQuiz.quiz_datetime <= today_end)
+        )
+        .exists()
+    ).scalar()
+    print(exists)
+
+    return exists
