@@ -87,37 +87,37 @@ def is_valid_time(time_str: str) -> bool:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    db_session = next(get_db())
-    context.user_data["menu_state"] = "starting_using_bot"
-    is_new_user = add_or_update_user(
-        update.effective_user.id, update.effective_user.username, db_session
-    )
+    with next(get_db()) as db_session:
+        context.user_data["menu_state"] = "starting_using_bot"
+        is_new_user = add_or_update_user(
+            update.effective_user.id, update.effective_user.username, db_session
+        )
 
-    if is_new_user or not is_user_ready_to_use(update.effective_user.id, db_session):
-        await update.message.reply_text(
-            "Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
-        )
-        await update.message.reply_text("Для початку, введіть своє повне ім'я.")
-        return IntroConversation.GET_NAME
-    else:
-        await update.message.reply_text(
-            f"Привіт, {update.effective_user.username}!",
-            reply_markup=main_menu_keyboard(),
-        )
+        if is_new_user or not is_user_ready_to_use(update.effective_user.id, db_session):
+            await update.message.reply_text(
+                "Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
+            )
+            await update.message.reply_text("Для початку, введіть своє повне ім'я.")
+            return IntroConversation.GET_NAME
+        else:
+            await update.message.reply_text(
+                f"Привіт, {update.effective_user.username}!",
+                reply_markup=main_menu_keyboard(),
+            )
 
 
 async def get_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text
-    db_session = next(get_db())
-    update_user_full_name(
-        chat_id=update.effective_chat.id, full_name=name, db=db_session
-    )
-    await update.message.reply_text(
-        f"Дякую, {name}! Тепер налаштуємо сповіщення. Введіть бажаний час для ранкового сповіщення. "
-        f"Його потрібно увести в форматі '08:00'. "
-        f"Введіть будь-який зручний час в рамках від 06:00 до 12:00! ",
-    )
-    return IntroConversation.GET_TIME
+    with next(get_db()) as db_session:
+        update_user_full_name(
+            chat_id=update.effective_chat.id, full_name=name, db=db_session
+        )
+        await update.message.reply_text(
+            f"Дякую, {name}! Тепер налаштуємо сповіщення. Введіть бажаний час для ранкового сповіщення. "
+            f"Його потрібно увести в форматі '08:00'. "
+            f"Введіть будь-який зручний час в рамках від 06:00 до 12:00! ",
+        )
+        return IntroConversation.GET_TIME
 
 
 async def get_morning_notification_time(
@@ -125,31 +125,31 @@ async def get_morning_notification_time(
 ):
     time_input = update.message.text
     if is_valid_time(time_input):
-        db_session = next(get_db())
-        hours, minutes = map(int, time_input.split(":")[:2])
+        with next(get_db()) as db_session:
+            hours, minutes = map(int, time_input.split(":")[:2])
 
-        datetime_now = datetime.now(tz=timezone)
-        datetime_time_input = timezone.localize(
-            datetime(
-                datetime_now.year, datetime_now.month, datetime_now.day, hours, minutes
+            datetime_now = datetime.now(tz=timezone)
+            datetime_time_input = timezone.localize(
+                datetime(
+                    datetime_now.year, datetime_now.month, datetime_now.day, hours, minutes
+                )
             )
-        )
-        if datetime_now < datetime_time_input:
-            next_execution_datetime = datetime_time_input
-        else:
-            next_execution_datetime = datetime_time_input + timedelta(days=1)
-        save_user_notification_preference(
-            chat_id=update.effective_user.id,
-            notification_type=NotificationType.MORNING_NOTIFICATION,
-            notification_time=time_input,
-            next_execution_datetime=next_execution_datetime,
-            db_session=db_session,
-        )
+            if datetime_now < datetime_time_input:
+                next_execution_datetime = datetime_time_input
+            else:
+                next_execution_datetime = datetime_time_input + timedelta(days=1)
+            save_user_notification_preference(
+                chat_id=update.effective_user.id,
+                notification_type=NotificationType.MORNING_NOTIFICATION,
+                notification_time=time_input,
+                next_execution_datetime=next_execution_datetime,
+                db_session=db_session,
+            )
 
-        await update.message.reply_text(
-            "Супер! Налаштування завершено!", reply_markup=main_menu_keyboard()
-        )
-        return ConversationHandler.END
+            await update.message.reply_text(
+                "Супер! Налаштування завершено!", reply_markup=main_menu_keyboard()
+            )
+            return ConversationHandler.END
     else:
         await update.message.reply_text(
             f"Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
@@ -198,22 +198,22 @@ async def switch_notifications(update, context):
 
 async def handle_notification_toggle(update, context):
     user_input = update.message.text
-    db_session = next(get_db())
-    notification_time_string = user_input.split(" - ")[0]
-    try:
-        notification = get_user_notification_by_time(
-            chat_id=update.effective_user.id,
-            time=notification_time_string,
-            db_session=db_session,
-        )
-    except DataError:
-        return
+    with next(get_db()) as db_session:
+        notification_time_string = user_input.split(" - ")[0]
+        try:
+            notification = get_user_notification_by_time(
+                chat_id=update.effective_user.id,
+                time=notification_time_string,
+                db_session=db_session,
+            )
+        except DataError:
+            return
 
-    toggle_user_notification(notification_id=notification.id, db_session=db_session)
-    await context.bot.send_message(
-        chat_id=update.effective_user.id, text="Налаштування успішно застосовано!"
-    )
-    await switch_notifications(update, context)
+        toggle_user_notification(notification_id=notification.id, db_session=db_session)
+        await context.bot.send_message(
+            chat_id=update.effective_user.id, text="Налаштування успішно застосовано!"
+        )
+        await switch_notifications(update, context)
 
 
 async def notification_time_change_menu(update, context):
@@ -226,26 +226,26 @@ async def notification_time_change_menu(update, context):
 
 async def handle_notification_time_change(update, context):
     user_input = update.message.text
-    db_session = next(get_db())
-    notification_time_string = user_input.split(" - ")[0]
-    try:
-        notification = get_user_notification_by_time(
-            chat_id=update.effective_user.id,
-            time=notification_time_string,
-            db_session=db_session,
-        )
-    except DataError:
-        return
+    with next(get_db()) as db_session:
+        notification_time_string = user_input.split(" - ")[0]
+        try:
+            notification = get_user_notification_by_time(
+                chat_id=update.effective_user.id,
+                time=notification_time_string,
+                db_session=db_session,
+            )
+        except DataError:
+            return
 
-    if notification:
-        context.user_data["notification_to_change"] = notification.id
-        await update.message.reply_text(
-            "Введіть новий час для цього сповіщення у форматі '08:00'. Час має бути між 06:00 та 12:00."
-        )
-    else:
-        await update.message.reply_text(
-            "Сповіщення не знайдено. Спробуйте ще раз або поверніться назад."
-        )
+        if notification:
+            context.user_data["notification_to_change"] = notification.id
+            await update.message.reply_text(
+                "Введіть новий час для цього сповіщення у форматі '08:00'. Час має бути між 06:00 та 12:00."
+            )
+        else:
+            await update.message.reply_text(
+                "Сповіщення не знайдено. Спробуйте ще раз або поверніться назад."
+            )
 
 
 async def change_user_notification_time(update, context):
@@ -256,36 +256,36 @@ async def change_user_notification_time(update, context):
         )
         return
 
-    db_session = next(get_db())
-    notification_id = context.user_data.get("notification_to_change")
-    if notification_id:
+    with next(get_db()) as db_session:
+        notification_id = context.user_data.get("notification_to_change")
+        if notification_id:
 
-        hours, minutes = map(int, time_input.split(":")[:2])
+            hours, minutes = map(int, time_input.split(":")[:2])
 
-        datetime_now = datetime.now(tz=timezone)
-        datetime_time_input = timezone.localize(
-            datetime(
-                datetime_now.year, datetime_now.month, datetime_now.day, hours, minutes
+            datetime_now = datetime.now(tz=timezone)
+            datetime_time_input = timezone.localize(
+                datetime(
+                    datetime_now.year, datetime_now.month, datetime_now.day, hours, minutes
+                )
             )
-        )
-        if datetime_now < datetime_time_input:
-            next_execution_datetime = datetime_time_input
-        else:
-            next_execution_datetime = datetime_time_input + timedelta(days=1)
+            if datetime_now < datetime_time_input:
+                next_execution_datetime = datetime_time_input
+            else:
+                next_execution_datetime = datetime_time_input + timedelta(days=1)
 
-        update_user_notification_time(
-            notification_id=notification_id,
-            new_time=time_input,
-            next_execution_datetime=next_execution_datetime,
-            db_session=db_session,
-        )
-        await update.message.reply_text(
-            "Час сповіщення успішно оновлено!",
-            reply_markup=keyboards.notification_configuration_keyboard(),
-        )
-        del context.user_data["notification_to_change"]
-    else:
-        await update.message.reply_text("Помилка: не вдалось знайти сповіщення.")
+            update_user_notification_time(
+                notification_id=notification_id,
+                new_time=time_input,
+                next_execution_datetime=next_execution_datetime,
+                db_session=db_session,
+            )
+            await update.message.reply_text(
+                "Час сповіщення успішно оновлено!",
+                reply_markup=keyboards.notification_configuration_keyboard(),
+            )
+            del context.user_data["notification_to_change"]
+        else:
+            await update.message.reply_text("Помилка: не вдалось знайти сповіщення.")
 
 
 async def training_menu(update, context):
@@ -315,33 +315,32 @@ async def handle_training_timer_start(update, context):
         )
         return TrainingStartQuiz.FIRST_QUESTION_ANSWER
     context.user_data["menu_state"] = "training_start_timer_start"
-    db_session = next(get_db())
-
-    training_id = start_user_training(
-        chat_id=update.effective_chat.id,
-        user_state_mark=user_input,
-        db_session=db_session,
-    )
-    if not training_id:
-        await context.bot.send_message(
+    with next(get_db()) as db_session:
+        training_id = start_user_training(
             chat_id=update.effective_chat.id,
-            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)",
+            user_state_mark=user_input,
+            db_session=db_session,
         )
-        await training_menu(update, context)
-    else:
-        dummy_pdf = "dummy.pdf"
-        context.user_data["training_id"] = training_id
+        if not training_id:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)",
+            )
+            await training_menu(update, context)
+        else:
+            dummy_pdf = "dummy.pdf"
+            context.user_data["training_id"] = training_id
 
-        await context.bot.send_document(
-            chat_id=update.effective_user.id,
-            document=dummy_pdf,
-            caption="Ось ваш файл для тренування!"
-        )
+            await context.bot.send_document(
+                chat_id=update.effective_user.id,
+                document=dummy_pdf,
+                caption="Ось ваш файл для тренування!"
+            )
 
-        await update.message.reply_text(
-            "Го го го!! Успіхів у тренуванні, тренування розпочато! (Тут ще кріпимо ПДФ)",
-            reply_markup=keyboards.training_in_progress_keyboard(),
-        )
+            await update.message.reply_text(
+                "Го го го!! Успіхів у тренуванні, тренування розпочато! (Тут ще кріпимо ПДФ)",
+                reply_markup=keyboards.training_in_progress_keyboard(),
+            )
 
     return ConversationHandler.END
 
@@ -396,19 +395,19 @@ async def handle_training_finish(update, context):
     training_hardness = context.user_data["training_stop_first_question"]
     training_id = context.user_data["training_id"]
 
-    db_session = next(get_db())
-    training_duration = stop_training(
-        training_id=training_id,
-        training_hardness=training_hardness,
-        training_discomfort=training_discomfort,
-        db_session=db_session,
-    )
-    await context.bot.send_message(
-        text=f"Супер! Ти тренувався аж {str(training_duration).split('.')[0]}! \n {get_random_motivation_message()} \n Тепер час відпочити)",
-        chat_id=update.effective_chat.id,
-    )
-    await training_menu(update, context)
-    return ConversationHandler.END
+    with next(get_db()) as db_session:
+        training_duration = stop_training(
+            training_id=training_id,
+            training_hardness=training_hardness,
+            training_discomfort=training_discomfort,
+            db_session=db_session,
+        )
+        await context.bot.send_message(
+            text=f"Супер! Ти тренувався аж {str(training_duration).split('.')[0]}! \n {get_random_motivation_message()} \n Тепер час відпочити)",
+            chat_id=update.effective_chat.id,
+        )
+        await training_menu(update, context)
+        return ConversationHandler.END
 
 
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -478,39 +477,39 @@ async def send_morning_notification(context, user_id):
 # Function to send the scheduled message
 async def send_scheduled_message(context: CallbackContext):
     datetime_now = datetime.now(tz=timezone)
-    db_session = next(get_db())
-    notifications = get_notifications_to_send_by_time(
-        current_datetime=datetime_now, db_session=db_session
-    )
-    for notification in notifications:
-        user_id = notification.user.chat_id
-        await send_morning_notification(context, user_id)
-        last_execution_datetime = datetime_now
-        next_execution_datetime = notification.next_execution_datetime + timedelta(
-            days=1
+    with next(get_db()) as db_session:
+        notifications = get_notifications_to_send_by_time(
+            current_datetime=datetime_now, db_session=db_session
         )
-        update_user_notification_preference_next_execution(
-            last_execution_datetime=last_execution_datetime,
-            next_execution_datetime=next_execution_datetime,
-            notification_id=notification.id,
-            db_session=db_session,
-        )
+        for notification in notifications:
+            user_id = notification.user.chat_id
+            await send_morning_notification(context, user_id)
+            last_execution_datetime = datetime_now
+            next_execution_datetime = notification.next_execution_datetime + timedelta(
+                days=1
+            )
+            update_user_notification_preference_next_execution(
+                last_execution_datetime=last_execution_datetime,
+                next_execution_datetime=next_execution_datetime,
+                notification_id=notification.id,
+                db_session=db_session,
+            )
 
 
 async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    db_session = next(get_db())
-    if is_user_had_morning_quiz_today(chat_id=update.effective_user.id, db_session=db_session):
-        await update.message.reply_text(
-            text=f"Ви вже проходили ранкове опитування сьогодні!",
-            reply_markup=main_menu_keyboard(),
-        )
-        return ConversationHandler.END
+    with next(get_db()) as db_session:
+        if is_user_had_morning_quiz_today(chat_id=update.effective_user.id, db_session=db_session):
+            await update.message.reply_text(
+                text=f"Ви вже проходили ранкове опитування сьогодні!",
+                reply_markup=main_menu_keyboard(),
+            )
+            return ConversationHandler.END
 
-    await update.message.reply_text(
-        text="Як ви себе почуваєте?",
-        reply_markup=keyboards.default_one_to_ten_keyboard(),
-    )
-    return MorningQuizConversation.FIRST_QUESTION_ANSWER
+        await update.message.reply_text(
+            text="Як ви себе почуваєте?",
+            reply_markup=keyboards.default_one_to_ten_keyboard(),
+        )
+        return MorningQuizConversation.FIRST_QUESTION_ANSWER
 
 
 async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -530,6 +529,9 @@ async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAUL
     return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
 
+async def after_training_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pass
+
 async def retrieve_morning_sleep_hours(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
@@ -542,23 +544,23 @@ async def retrieve_morning_sleep_hours(
         return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
     context.user_data["morning_sleep_time"] = input_text
-    db_session = next(get_db())
+    with next(get_db()) as db_session:
 
-    save_morning_quiz_results(
-        user_id=update.effective_user.id,
-        quiz_datetime=datetime.now(timezone),
-        user_feelings=context.user_data["morning_feelings"],
-        user_sleeping_hours=context.user_data["morning_sleep_time"],
-        db_session=db_session
-    )
-    await update.message.reply_text(
-        text=f"Дякую! Ваші дані збережено: \n "
-             f"Ви поспали: {context.user_data['morning_sleep_time']} \n "
-             f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
-             f"Гарного дня!",
-        reply_markup=main_menu_keyboard(),
-    )
-    return ConversationHandler.END
+        save_morning_quiz_results(
+            user_id=update.effective_user.id,
+            quiz_datetime=datetime.now(timezone),
+            user_feelings=context.user_data["morning_feelings"],
+            user_sleeping_hours=context.user_data["morning_sleep_time"],
+            db_session=db_session
+        )
+        await update.message.reply_text(
+            text=f"Дякую! Ваші дані збережено: \n "
+                 f"Ви поспали: {context.user_data['morning_sleep_time']} \n "
+                 f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
+                 f"Гарного дня!",
+            reply_markup=main_menu_keyboard(),
+        )
+        return ConversationHandler.END
 
 
 if __name__ == "__main__":

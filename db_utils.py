@@ -24,6 +24,7 @@ def add_or_update_user(chat_id: int, username: str, db: Session):
         is_created = False
         user.username = username
     db.commit()
+    
     return is_created
 
 
@@ -33,20 +34,24 @@ def update_user_full_name(chat_id: int, full_name: str, db: Session):
         raise UserNotFoundError(chat_id)
     user.full_name = full_name
     db.commit()
+    
 
 
 def is_user_ready_to_use(chat_id: int, db: Session):
     user = db.query(User).filter_by(chat_id=str(chat_id)).first()
     if not user:
+        
         raise UserNotFoundError(chat_id)
 
     if not user.full_name:
+        
         return False
 
     user_notifications = db.query(NotificationPreference).filter_by(user=user).first()
     if not user_notifications:
+        
         return False
-
+    
     return True
 
 
@@ -55,7 +60,10 @@ def is_active_user(chat_id: int, db: Session):
     if not user:
         raise UserNotFoundError(chat_id)
     if user.payment_status == UserPaymentStatus.ACTIVE or user.role == UserRole.ADMIN:
+        
         return True
+
+    
     return False
 
 
@@ -64,12 +72,15 @@ def is_admin_user(chat_id: int, db: Session):
     if not user:
         raise UserNotFoundError(chat_id)
     if user.role == UserRole.ADMIN:
+        
         return True
+    
     return False
 
 
 def get_all_users(db: Session):
     users = db.query(User).filter_by(payment_status=UserPaymentStatus.ACTIVE).all()
+    
     return users
 
 
@@ -104,6 +115,7 @@ def save_user_notification_preference(
         db_session.add(notification_preference)
         is_created = True
     db_session.commit()
+    
     return is_created
 
 
@@ -117,6 +129,7 @@ def get_user_notifications(chat_id: int, db_session: Session, is_active: bool = 
         .filter_by(user_id=user.id, is_active=is_active)
         .all()
     )
+    
     return notifications
 
 
@@ -129,6 +142,7 @@ def update_user_notification_time(
     notification.notification_time = new_time
     notification.next_execution_datetime = next_execution_datetime
     db_session.commit()
+    
 
 
 def get_user_notification_by_time(chat_id: int, time: str, db_session: Session):
@@ -140,6 +154,7 @@ def get_user_notification_by_time(chat_id: int, time: str, db_session: Session):
         .filter_by(user=user, notification_time=time)
         .first()
     )
+    
     return notification
 
 
@@ -149,6 +164,7 @@ def toggle_user_notification(notification_id: int, db_session: Session):
     )
     notification.is_active = not notification.is_active
     db_session.commit()
+    
 
 
 def start_user_training(chat_id: int, user_state_mark: str, db_session: Session):
@@ -171,6 +187,7 @@ def start_user_training(chat_id: int, user_state_mark: str, db_session: Session)
 
     db_session.add(training)
     db_session.commit()
+    
     return training.id
 
 
@@ -178,6 +195,7 @@ def cancel_training(training_id: int, db_session: Session):
     training = db_session.query(Training).filter_by(id=training_id).first()
     if training:
         training.canceled = True
+    
 
 
 def stop_training(
@@ -197,6 +215,7 @@ def stop_training(
         training.training_hardness = training_hardness
         training.training_discomfort = training_discomfort
         db_session.commit()
+        
         return training.training_duration
 
 
@@ -209,6 +228,7 @@ def get_notifications_to_send_by_time(current_datetime, db_session: Session):
             & (NotificationPreference.is_active.is_(True))
         )
     ).all()
+    
     return notification_preferences
 
 
@@ -225,6 +245,7 @@ def update_user_notification_preference_next_execution(
     notification_preference.next_execution_datetime = next_execution_datetime
 
     db_session.commit()
+    
 
 
 def save_morning_quiz_results(user_id, quiz_datetime, user_feelings, user_sleeping_hours, db_session):
@@ -240,6 +261,7 @@ def save_morning_quiz_results(user_id, quiz_datetime, user_feelings, user_sleepi
     )
     db_session.add(morning_quiz)
     db_session.commit()
+    
 
 
 def is_user_had_morning_quiz_today(chat_id, db_session):
@@ -249,7 +271,6 @@ def is_user_had_morning_quiz_today(chat_id, db_session):
 
     today_start = datetime.datetime.combine(datetime.date.today(), datetime.datetime.min.time())
     today_end = datetime.datetime.combine(datetime.date.today(), datetime.datetime.max.time())
-    print(today_start, today_end)
     exists = db_session.query(
         db_session.query(MorningQuiz)
         .filter(
@@ -259,6 +280,5 @@ def is_user_had_morning_quiz_today(chat_id, db_session):
         )
         .exists()
     ).scalar()
-    print(exists)
-
+    
     return exists
