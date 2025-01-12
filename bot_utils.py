@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 from database import get_db
 from db_utils import is_active_user, is_admin_user
+from random import shuffle
 
 
 def payment_restricted(func):
@@ -32,3 +33,10 @@ def admin_restricted(func):
         await func(update, context)
 
     return wrapper
+
+
+def get_random_motivation_message():
+    with open("motivational_messages.txt", "r", encoding="UTF-8") as input_file:
+        lines = input_file.read().split("\n")
+        shuffle(lines)
+        return lines[0]

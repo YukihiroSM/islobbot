@@ -8,7 +8,7 @@ from enum import Enum, auto
 import asyncio
 import schedule
 from sqlalchemy.exc import DataError
-from telegram import Update, Bot
+from telegram import Update, Bot, InputFile
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -21,6 +21,7 @@ from telegram.ext import (
 
 import keyboards
 import text_constants
+from bot_utils import get_random_motivation_message
 from config import BOT_TOKEN, ADMIN_CHAT_ID, timezone
 from config import DATABASE_URL
 from database import get_db
@@ -258,9 +259,24 @@ async def change_user_notification_time(update, context):
     db_session = next(get_db())
     notification_id = context.user_data.get("notification_to_change")
     if notification_id:
+
+        hours, minutes = map(int, time_input.split(":")[:2])
+
+        datetime_now = datetime.now(tz=timezone)
+        datetime_time_input = timezone.localize(
+            datetime(
+                datetime_now.year, datetime_now.month, datetime_now.day, hours, minutes
+            )
+        )
+        if datetime_now < datetime_time_input:
+            next_execution_datetime = datetime_time_input
+        else:
+            next_execution_datetime = datetime_time_input + timedelta(days=1)
+
         update_user_notification_time(
             notification_id=notification_id,
             new_time=time_input,
+            next_execution_datetime=next_execution_datetime,
             db_session=db_session,
         )
         await update.message.reply_text(
@@ -313,11 +329,20 @@ async def handle_training_timer_start(update, context):
         )
         await training_menu(update, context)
     else:
+        dummy_pdf = "dummy.pdf"
         context.user_data["training_id"] = training_id
+
+        await context.bot.send_document(
+            chat_id=update.effective_user.id,
+            document=dummy_pdf,
+            caption="Ось ваш файл для тренування!"
+        )
+
         await update.message.reply_text(
-            "Го го го!! Успіхів у тренуванні, тренування розпочато!",
+            "Го го го!! Успіхів у тренуванні, тренування розпочато! (Тут ще кріпимо ПДФ)",
             reply_markup=keyboards.training_in_progress_keyboard(),
         )
+
     return ConversationHandler.END
 
 
@@ -379,7 +404,7 @@ async def handle_training_finish(update, context):
         db_session=db_session,
     )
     await context.bot.send_message(
-        text=f"Супер! Ти тренувався аж {str(training_duration).split('.')[0]}! Тепер час відпочити)",
+        text=f"Супер! Ти тренувався аж {str(training_duration).split('.')[0]}! \n {get_random_motivation_message()} \n Тепер час відпочити)",
         chat_id=update.effective_chat.id,
     )
     await training_menu(update, context)

@@ -121,12 +121,13 @@ def get_user_notifications(chat_id: int, db_session: Session, is_active: bool = 
 
 
 def update_user_notification_time(
-    notification_id: int, new_time: str, db_session: Session
+    notification_id: int, new_time: str, next_execution_datetime, db_session: Session
 ):
     notification = (
         db_session.query(NotificationPreference).filter_by(id=notification_id).first()
     )
     notification.notification_time = new_time
+    notification.next_execution_datetime = next_execution_datetime
     db_session.commit()
 
 
