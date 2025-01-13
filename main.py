@@ -8,7 +8,7 @@ from enum import Enum, auto
 import asyncio
 import schedule
 from sqlalchemy.exc import DataError
-from telegram import Update, Bot, InputFile
+from telegram import Update, Bot, InputFile, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -16,7 +16,7 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
-    CallbackContext,
+    CallbackContext, CallbackQueryHandler,
 )
 
 import keyboards
@@ -37,8 +37,9 @@ from db_utils import (
     stop_training,
     get_notifications_to_send_by_time,
     update_user_notification_preference_next_execution, save_morning_quiz_results, is_user_had_morning_quiz_today,
+    get_users_with_yesterday_trainings, update_training_after_quiz,
 )
-from keyboards import main_menu_keyboard
+from keyboards import main_menu_keyboard, default_one_to_ten_keyboard, yes_no_keyboard
 from models import NotificationType
 
 
@@ -68,6 +69,11 @@ class TrainingStartQuiz(Enum):
 
 
 class TrainingFinishQuiz(Enum):
+    FIRST_QUESTION_ANSWER = auto()
+    SECOND_QUESTION_ANSWER = auto()
+
+
+class AfterTrainingQuiz(Enum):
     FIRST_QUESTION_ANSWER = auto()
     SECOND_QUESTION_ANSWER = auto()
 
@@ -470,8 +476,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def send_morning_notification(context, user_id):
-    morning_notification_text = "Привіт! Час пройти ранкове опитування! Натисни на команду, щоб почати: /start_morning_quiz"
-    await context.bot.send_message(chat_id=user_id, text=morning_notification_text)
+    morning_notification_text = "Привіт! Час пройти ранкове опитування! Натисни на кнопку, щоб почати"
+    await context.bot.send_message(chat_id=user_id, text=morning_notification_text, reply_markup=keyboards.start_morning_quiz_keyboard())
 
 
 # Function to send the scheduled message
@@ -484,6 +490,7 @@ async def send_scheduled_message(context: CallbackContext):
         for notification in notifications:
             user_id = notification.user.chat_id
             await send_morning_notification(context, user_id)
+
             last_execution_datetime = datetime_now
             next_execution_datetime = notification.next_execution_datetime + timedelta(
                 days=1
@@ -499,13 +506,15 @@ async def send_scheduled_message(context: CallbackContext):
 async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with next(get_db()) as db_session:
         if is_user_had_morning_quiz_today(chat_id=update.effective_user.id, db_session=db_session):
-            await update.message.reply_text(
+            await context.bot.send_message(
+                chat_id=update.effective_user.id,
                 text=f"Ви вже проходили ранкове опитування сьогодні!",
                 reply_markup=main_menu_keyboard(),
             )
             return ConversationHandler.END
 
-        await update.message.reply_text(
+        await context.bot.send_message(
+            chat_id=update.effective_user.id,
             text="Як ви себе почуваєте?",
             reply_markup=keyboards.default_one_to_ten_keyboard(),
         )
@@ -528,9 +537,6 @@ async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAUL
     )
     return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
-
-async def after_training_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    pass
 
 async def retrieve_morning_sleep_hours(
     update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -563,6 +569,91 @@ async def retrieve_morning_sleep_hours(
         return ConversationHandler.END
 
 
+async def send_after_training_messages(context: CallbackContext):
+    datetime_now = datetime.now(tz=timezone)
+    yesterday_date = (datetime_now - timedelta(days=1)).date()
+    with next(get_db()) as db_session:
+        results = get_users_with_yesterday_trainings(db_session)
+        users_trainings_to_process = dict()
+        for user in results:
+            for training in user.trainings:
+                if training.training_start_date.date() == yesterday_date:
+                    users_trainings_to_process[user.chat_id] = {
+                        "training_id": training.id,
+                        "training_duration": training.training_duration,
+                        "training_start_date": training.training_start_date
+                    }
+        await send_after_training_quiz_notifications(context, users_trainings_to_process)
+
+
+async def send_after_training_quiz_notifications(context, users_data):
+    for user_id, training in users_data.items():
+        after_training_notification_text = f"Обєд! Час пройти опитування після тренування {str(training['training_start_date']).split('.')[0]}! Натисни на кнопку, аби розпочати"
+        keyboard = [
+            [InlineKeyboardButton("Пройти опитування", callback_data=f"after_training_quiz:{training['training_id']}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(chat_id=user_id, text=after_training_notification_text, reply_markup=reply_markup)
+
+
+async def run_after_training_quiz(update, context):
+    query = update.callback_query
+    query.answer()
+
+    callback_data = query.data
+    training_id = callback_data.split(":")[1]
+    context.user_data["training_id"] = training_id
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Оцініть свій рівень стресу (1 - немає стресу, 10 - панічна атака):",
+        reply_markup=default_one_to_ten_keyboard()
+    )
+    return AfterTrainingQuiz.FIRST_QUESTION_ANSWER
+
+
+async def retrieve_after_training_first_answer(update, context):
+    input_text = update.message.text
+
+    if input_text not in text_constants.ONE_TO_TEN_MARKS:
+        await update.message.reply_text(
+            text="Оцініть свій рівень стресу (1 - немає стресу, 10 - панічна атака):",
+            reply_markup=default_one_to_ten_keyboard()
+        )
+        return AfterTrainingQuiz.FIRST_QUESTION_ANSWER
+
+    context.user_data["after_training_stress_level"] = input_text
+    await update.message.reply_text(
+        text="Чи є у вас крепатура?",
+        reply_markup=yes_no_keyboard()
+    )
+    return AfterTrainingQuiz.SECOND_QUESTION_ANSWER
+
+
+async def retrieve_after_training_second_answer(update, context):
+    input_text = update.message.text
+
+    if input_text not in text_constants.YES_NO_BUTTONS:
+        await update.message.reply_text(
+            text="Чи є у вас крепатура?",
+            reply_markup=yes_no_keyboard()
+        )
+        return AfterTrainingQuiz.SECOND_QUESTION_ANSWER
+
+    with next(get_db()) as db_session:
+        update_training_after_quiz(
+            training_id=context.user_data["training_id"],
+            stress_level=context.user_data["after_training_stress_level"],
+            soreness=input_text,
+            db_session=db_session
+        )
+    await update.message.reply_text(
+        text="Дякую, що пройшли опитування! Гарного продовження дня!",
+        reply_markup=main_menu_keyboard()
+    )
+    return ConversationHandler.END
+
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -582,7 +673,7 @@ if __name__ == "__main__":
     )
 
     morning_quiz_conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start_morning_quiz", start_morning_quiz)],
+        entry_points=[CallbackQueryHandler(start_morning_quiz, pattern="^morning_quiz$")],
         states={
             MorningQuizConversation.FIRST_QUESTION_ANSWER: [
                 MessageHandler(
@@ -628,14 +719,35 @@ if __name__ == "__main__":
         fallbacks=[CommandHandler("cancel", cancel)]
     )
 
+    after_training_quiz_conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(run_after_training_quiz, pattern="^after_training_quiz:")],
+        states = {
+            AfterTrainingQuiz.FIRST_QUESTION_ANSWER: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, retrieve_after_training_first_answer
+                )
+            ],
+            AfterTrainingQuiz.SECOND_QUESTION_ANSWER: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, retrieve_after_training_second_answer
+                )
+            ]
+        },
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
+
     app.add_handler(intro_conv_handler)
     app.add_handler(morning_quiz_conv_handler)
     app.add_handler(training_start_quiz_conv_handler)
     app.add_handler(training_finish_quiz_conv_handler)
+    app.add_handler(after_training_quiz_conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
+    # app.add_handler(CommandHandler("test", send_after_training_messages))
 
     job_queue = app.job_queue
 
     # Add a job that runs every 30 seconds to send the scheduled message
     job_queue.run_repeating(send_scheduled_message, interval=10, first=0)
+    scheduled_time = datetime_time(hour=10, minute=24, tzinfo=timezone)
+    job_queue.run_daily(send_after_training_messages, time=scheduled_time)
     app.run_polling()

@@ -1,5 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import select, and_, func, cast, Date
 from sqlalchemy.orm import Session, joinedload
+
+import text_constants
 from models import (
     UserPaymentStatus,
     UserRole,
@@ -282,3 +284,24 @@ def is_user_had_morning_quiz_today(chat_id, db_session):
     ).scalar()
     
     return exists
+
+
+def get_users_with_yesterday_trainings(session):
+    yesterday_date = datetime.datetime.now() - datetime.timedelta(days=1)
+    results = (
+        session.query(User)
+        .join(Training, User.id == Training.user_id)
+        .filter(
+            cast(Training.training_start_date, Date) == cast(yesterday_date, Date)
+        )
+        .all()
+    )
+    return results
+
+
+def update_training_after_quiz(training_id, stress_level, soreness, db_session):
+    training = db_session.query(Training).filter_by(id=training_id).first()
+
+    training.stress_on_next_day = stress_level
+    training.soreness_on_next_day = True if soreness == text_constants.YES_NO_BUTTONS[0] else False
+    db_session.commit()

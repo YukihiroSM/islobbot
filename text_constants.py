@@ -8,3 +8,5 @@ START_TRAINING = "Розпочати тренування"
 END_TRAINING = "Завершити тренування"
 CANCEL_TRAINING = "Відмінити тренування"
 ONE_TO_TEN_MARKS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+START_MORNING_QUIZ = "Пройти ранкове опитування"
+YES_NO_BUTTONS = ["Так", "Ні"]

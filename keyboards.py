@@ -1,5 +1,5 @@
 import text_constants
-from telegram import ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from database import get_db
 from db_utils import get_user_notifications
 
@@ -96,4 +96,22 @@ def training_in_progress_keyboard():
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
+    )
+
+
+def start_morning_quiz_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("Пройти опитування", callback_data="morning_quiz")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    return reply_markup
+
+
+def yes_no_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            text_constants.YES_NO_BUTTONS,
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
     )
