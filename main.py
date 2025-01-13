@@ -654,6 +654,23 @@ async def retrieve_after_training_second_answer(update, context):
     return ConversationHandler.END
 
 
+async def send_evening_after_training_motivation_message(context, user_ids):
+    for user_id in user_ids:
+        message = get_random_motivation_message()
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=message,
+        )
+
+
+async def get_evening_after_training_motivation(context):
+    with next(get_db()) as db_session:
+        results = get_users_with_yesterday_trainings(db_session)
+        user_ids = [user.chat_id for user in results]
+        await send_evening_after_training_motivation_message(context, user_ids)
+
+
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -742,12 +759,14 @@ if __name__ == "__main__":
     app.add_handler(training_finish_quiz_conv_handler)
     app.add_handler(after_training_quiz_conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
-    # app.add_handler(CommandHandler("test", send_after_training_messages))
 
     job_queue = app.job_queue
 
     # Add a job that runs every 30 seconds to send the scheduled message
     job_queue.run_repeating(send_scheduled_message, interval=10, first=0)
-    scheduled_time = datetime_time(hour=10, minute=24, tzinfo=timezone)
-    job_queue.run_daily(send_after_training_messages, time=scheduled_time)
+    after_training_quiz_scheduled_time = datetime_time(hour=15, minute=0, tzinfo=timezone)
+    job_queue.run_daily(send_after_training_messages, time=after_training_quiz_scheduled_time)
+
+    after_training_motivation_time = datetime_time(hour=18, minute=0, tzinfo=timezone)
+    job_queue.run_daily(get_evening_after_training_motivation, time=after_training_motivation_time)
     app.run_polling()
