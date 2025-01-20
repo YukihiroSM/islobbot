@@ -113,5 +113,5 @@ def yes_no_keyboard():
             text_constants.YES_NO_BUTTONS,
         ],
         resize_keyboard=True,
-        one_time_keyboard=True
+        one_time_keyboard=True,
     )

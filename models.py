@@ -28,6 +28,9 @@ class UserPaymentStatus(PyEnum):
 
 class NotificationType(PyEnum):
     MORNING_NOTIFICATION = "morning_notification"
+    CUSTOM_NOTIFICATION = "custom_notification"
+    TRAINING_REMINDER_NOTIFICATION = "training_reminder_notification"
+    STOP_TRAINING_NOTIFICATION = "stop_training_notification"
 
 
 class NotificationPreference(Base):
@@ -39,7 +42,9 @@ class NotificationPreference(Base):
     notification_time = Column(Time, nullable=False)
     last_execution_datetime = Column(DateTime, nullable=True)
     next_execution_datetime = Column(DateTime, nullable=True)
+    notification_message = Column(String, nullable=True)
     is_active = Column(Boolean, default=False)
+    admin_warning_sent = Column(DateTime, nullable=True)
     __table_args__ = (
         UniqueConstraint(
             "user_id", "notification_type", name="uq_user_notification_type"
@@ -101,6 +106,8 @@ class MorningQuiz(Base):
     quiz_datetime = Column(DateTime, nullable=False)
     user_feelings = Column(Integer, nullable=False)
     user_feelings_comment = Column(String, nullable=True)
-    user_sleeping_hours = Column(Integer, nullable=False)
+    user_sleeping_hours = Column(Time, nullable=False)
+    is_going_to_have_training = Column(Boolean, nullable=False, default=False)
+    expected_training_datetime = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="morning_quizzes")
