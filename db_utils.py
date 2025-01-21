@@ -1,4 +1,4 @@
-from sqlalchemy import select, and_, func, cast, Date
+from sqlalchemy import select, and_, func, cast, Date, DateTime
 from sqlalchemy.orm import Session, joinedload
 
 import text_constants
@@ -31,6 +31,13 @@ def add_or_update_user(chat_id: int, username: str, db: Session):
     return is_created
 
 
+def get_user_by_chat_id(chat_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    if not user:
+        raise UserNotFoundError(chat_id)
+    return user
+
+
 def update_user_full_name(chat_id: int, full_name: str, db: Session):
     user = db.query(User).filter_by(chat_id=str(chat_id)).first()
     if not user:
@@ -49,7 +56,11 @@ def is_user_ready_to_use(chat_id: int, db: Session):
 
         return False
 
-    user_notifications = db.query(NotificationPreference).filter_by(user=user).first()
+    user_notifications = (
+        db.query(NotificationPreference)
+        .filter_by(user=user, notification_type=NotificationType.MORNING_NOTIFICATION)
+        .first()
+    )
     if not user_notifications:
 
         return False
@@ -127,7 +138,11 @@ def get_user_notifications(chat_id: int, db_session: Session, is_active: bool = 
 
     notifications = (
         db_session.query(NotificationPreference)
-        .filter_by(user_id=user.id, is_active=is_active)
+        .filter_by(
+            user_id=user.id,
+            is_active=is_active,
+            notification_type=NotificationType.MORNING_NOTIFICATION,
+        )
         .all()
     )
 
@@ -211,7 +226,7 @@ def stop_training(
             training.training_finish_date - training.training_start_date
         )
         training.training_hardness = training_hardness
-        training.training_discomfort = training_discomfort
+        training.training_discomfort = True if training_discomfort == text_constants.YES_NO_BUTTONS[0] else False
         db_session.commit()
 
         return training.training_duration
@@ -225,6 +240,7 @@ def get_notifications_to_send_by_time(current_datetime, db_session: Session):
             (NotificationPreference.next_execution_datetime <= current_datetime)
             & (NotificationPreference.is_active.is_(True))
         )
+        .filter(NotificationPreference.notification_type == NotificationType.MORNING_NOTIFICATION)
     ).all()
 
     return notification_preferences
@@ -246,7 +262,13 @@ def update_user_notification_preference_next_execution(
 
 
 def save_morning_quiz_results(
-    user_id, quiz_datetime, user_feelings, user_sleeping_hours, db_session
+    user_id,
+    quiz_datetime,
+    user_feelings,
+    user_sleeping_hours,
+    db_session,
+    is_going_to_have_training,
+    expected_training_datetime=None,
 ):
     user = db_session.query(User).filter_by(chat_id=str(user_id)).first()
     if not user:
@@ -258,6 +280,14 @@ def save_morning_quiz_results(
         user_feelings=user_feelings,
         user_sleeping_hours=user_sleeping_hours,
     )
+    if is_going_to_have_training == text_constants.YES_NO_BUTTONS[0]:
+        morning_quiz.is_going_to_have_training = True
+    else:
+        morning_quiz.is_going_to_have_training = False
+
+    if morning_quiz.is_going_to_have_training and expected_training_datetime:
+        morning_quiz.expected_training_datetime = expected_training_datetime
+
     db_session.add(morning_quiz)
     db_session.commit()
 
@@ -314,4 +344,73 @@ def update_user_notification_preference_admin_message_sent(
         db_session.query(NotificationPreference).filter_by(id=notification_id).first()
     )
     notification.admin_warning_sent = sent_datetime
+    db_session.commit()
+
+
+def get_notifications_by_type(notification_type, db_session):
+    datetime_now = datetime.datetime.now(tz=timezone)
+    notifications = (
+        db_session.query(NotificationPreference)
+        .join(User, NotificationPreference.user_id == User.id)
+        .options(joinedload(NotificationPreference.user))
+        .filter(NotificationPreference.notification_type == notification_type)
+        .filter(NotificationPreference.notification_sent == False)
+        .filter(NotificationPreference.is_active == True)
+        .filter(cast(NotificationPreference.next_execution_datetime, DateTime) <= cast(datetime_now, DateTime))
+        .all()
+    )
+    return notifications
+
+
+def create_training_notifications(chat_id, notification_time, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    if not user:
+        raise UserNotFoundError(chat_id)
+
+    notification_types = [
+        NotificationType.PRE_TRAINING_REMINDER_NOTIFICATION,
+        NotificationType.TRAINING_REMINDER_NOTIFICATION,
+        NotificationType.STOP_TRAINING_NOTIFICATION
+    ]
+
+    for notification_type in notification_types:
+        notification_preference = (
+            db_session.query(NotificationPreference)
+            .filter_by(user_id=user.id, notification_type=notification_type.value)
+            .first()
+        )
+
+        hours, minutes = map(int, notification_time.split(":"))
+        datetime_now = datetime.datetime.now(tz=timezone)
+        next_execution_datetime = datetime_now.replace(hour=hours, minute=minutes, second=0, microsecond=0)
+
+        if notification_type == NotificationType.PRE_TRAINING_REMINDER_NOTIFICATION:
+            next_execution_datetime = next_execution_datetime - datetime.timedelta(hours=1)
+
+        if notification_type == NotificationType.STOP_TRAINING_NOTIFICATION:
+            next_execution_datetime = next_execution_datetime + datetime.timedelta(hours=1, minutes=15)
+
+        if notification_preference:
+            notification_preference.notification_time = notification_time
+            notification_preference.is_active = True
+            notification_preference.notification_sent = False
+            notification_preference.next_execution_datetime = next_execution_datetime
+            is_created = False
+        else:
+            notification_preference = NotificationPreference(
+                user_id=user.id,
+                notification_type=notification_type,
+                notification_time=notification_time,
+                notification_sent=False,
+                next_execution_datetime=next_execution_datetime,
+                is_active=True,
+            )
+            db_session.add(notification_preference)
+
+        db_session.commit()
+
+
+def update_notification_sent(notification_id, db_session):
+    notification = db_session.query(NotificationPreference).filter_by(id=notification_id).first()
+    notification.notification_sent = True
     db_session.commit()

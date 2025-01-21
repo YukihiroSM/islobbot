@@ -29,6 +29,7 @@ class UserPaymentStatus(PyEnum):
 class NotificationType(PyEnum):
     MORNING_NOTIFICATION = "morning_notification"
     CUSTOM_NOTIFICATION = "custom_notification"
+    PRE_TRAINING_REMINDER_NOTIFICATION = "pre_training_reminder_notification"
     TRAINING_REMINDER_NOTIFICATION = "training_reminder_notification"
     STOP_TRAINING_NOTIFICATION = "stop_training_notification"
 
@@ -43,8 +44,9 @@ class NotificationPreference(Base):
     last_execution_datetime = Column(DateTime, nullable=True)
     next_execution_datetime = Column(DateTime, nullable=True)
     notification_message = Column(String, nullable=True)
-    is_active = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     admin_warning_sent = Column(DateTime, nullable=True)
+    notification_sent = Column(Boolean, default=False)
     __table_args__ = (
         UniqueConstraint(
             "user_id", "notification_type", name="uq_user_notification_type"
@@ -91,7 +93,7 @@ class Training(Base):
     training_finish_date = Column(DateTime, nullable=True)
     training_duration = Column(Time, nullable=True)
     training_hardness = Column(Integer, nullable=True)
-    training_discomfort = Column(Integer, nullable=True)
+    training_discomfort = Column(Boolean, nullable=True)
     stress_on_next_day = Column(Integer, nullable=True)
     soreness_on_next_day = Column(Boolean, nullable=True)
     canceled = Column(Boolean, default=False)
