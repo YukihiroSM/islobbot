@@ -457,7 +457,7 @@ async def handle_training_finish(update, context):
                  f"Тепер час відпочити)",
             chat_id=update.effective_chat.id,
         )
-        await training_menu(update, context)
+        await main_menu(update, context)
         return ConversationHandler.END
 
 
