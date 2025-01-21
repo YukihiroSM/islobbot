@@ -199,6 +199,32 @@ def start_user_training(chat_id: int, user_state_mark: str, db_session: Session)
         canceled=False,
     )
 
+    notification_preference = (
+        db_session.query(NotificationPreference)
+        .filter_by(user_id=user.id, notification_type=NotificationType.STOP_TRAINING_NOTIFICATION)
+        .first()
+    )
+
+    datetime_now = datetime.datetime.now(tz=timezone)
+    next_execution_datetime = datetime_now + datetime.timedelta(hours=1, minutes=15)
+
+    if notification_preference:
+        notification_preference.notification_time = "00:00"
+        notification_preference.is_active = True
+        notification_preference.notification_sent = False
+        notification_preference.next_execution_datetime = next_execution_datetime
+        is_created = False
+    else:
+        notification_preference = NotificationPreference(
+            user_id=user.id,
+            notification_type=NotificationType.STOP_TRAINING_NOTIFICATION,
+            notification_time="00:00",
+            notification_sent=False,
+            next_execution_datetime=next_execution_datetime,
+            is_active=True,
+        )
+        db_session.add(notification_preference)
+
     db_session.add(training)
     db_session.commit()
 
@@ -370,13 +396,12 @@ def create_training_notifications(chat_id, notification_time, db_session):
     notification_types = [
         NotificationType.PRE_TRAINING_REMINDER_NOTIFICATION,
         NotificationType.TRAINING_REMINDER_NOTIFICATION,
-        NotificationType.STOP_TRAINING_NOTIFICATION
     ]
 
     for notification_type in notification_types:
         notification_preference = (
             db_session.query(NotificationPreference)
-            .filter_by(user_id=user.id, notification_type=notification_type.value)
+            .filter_by(user_id=user.id, notification_type=notification_type)
             .first()
         )
 
@@ -386,9 +411,6 @@ def create_training_notifications(chat_id, notification_time, db_session):
 
         if notification_type == NotificationType.PRE_TRAINING_REMINDER_NOTIFICATION:
             next_execution_datetime = next_execution_datetime - datetime.timedelta(hours=1)
-
-        if notification_type == NotificationType.STOP_TRAINING_NOTIFICATION:
-            next_execution_datetime = next_execution_datetime + datetime.timedelta(hours=1, minutes=15)
 
         if notification_preference:
             notification_preference.notification_time = notification_time

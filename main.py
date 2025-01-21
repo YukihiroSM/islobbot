@@ -872,6 +872,28 @@ async def get_training_notifications(context):
         await send_training_notifications(context, notification)
 
 
+async def send_stop_training_notifications(context, notification):
+    try:
+        await context.bot.send_message(
+            chat_id=notification.user.chat_id,
+            text=f"Привіт! Твоє тренування триває вже більше години. Не забув завершити?"
+        )
+        with next(get_db()) as db_session:
+            update_notification_sent(notification.id, db_session)
+    except Exception as e:
+        print(f"UNABLE TO SEND MESSAGE TO {notification.user.chat_id}, {e}")
+
+
+async def stop_training_notification(context):
+    with next(get_db()) as db_session:
+        notifications = get_notifications_by_type(
+            notification_type=NotificationType.STOP_TRAINING_NOTIFICATION,
+            db_session=db_session,
+        )
+    for notification in notifications:
+        await send_stop_training_notifications(context, notification)
+
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -1004,5 +1026,6 @@ if __name__ == "__main__":
 
     job_queue.run_repeating(get_pre_training_notifications, interval=10, first=0)
     job_queue.run_repeating(get_training_notifications, interval=10, first=0)
+    job_queue.run_repeating(stop_training_notification, interval=10, first=0)
 
     app.run_polling()
