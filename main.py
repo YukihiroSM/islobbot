@@ -183,7 +183,7 @@ async def get_morning_notification_time(
             )
 
             await update.message.reply_text(
-                "Супер! Налаштування завершено!", reply_markup=main_menu_keyboard()
+                "Супер! Налаштування завершено! Тепер очікуй від бота сповіщень у вказаний час!", reply_markup=main_menu_keyboard()
             )
             return ConversationHandler.END
     else:
