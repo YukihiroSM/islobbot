@@ -1,7 +1,8 @@
-import os
-from dotenv import load_dotenv
-import pytz
 import json
+import os
+
+import pytz
+from dotenv import load_dotenv
 
 load_dotenv()
 BOT_TOKEN = os.environ.get("TOKEN")

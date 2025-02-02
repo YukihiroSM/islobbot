@@ -1,5 +1,6 @@
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+
 import text_constants
-from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from database import get_db
 from db_utils import get_user_notifications
 

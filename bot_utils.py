@@ -1,8 +1,13 @@
+import datetime
+import re
+from datetime import time as datetime_time
+from random import shuffle
+
 from telegram import Update
 from telegram.ext import CallbackContext
+
 from database import get_db
 from db_utils import is_active_user, is_admin_user
-from random import shuffle
 
 
 def payment_restricted(func):
@@ -40,3 +45,31 @@ def get_random_motivation_message():
         lines = input_file.read().split("\n")
         shuffle(lines)
         return f"Трішки мотивації тобі: \n{lines[0]}"
+
+
+def is_valid_morning_time(time_str: str) -> bool:
+    try:
+        match = re.match(r"^(0?[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$", time_str)
+        min_time = datetime_time(hour=6)
+        max_time = datetime_time(hour=12)
+
+        time = datetime.datetime.strptime(time_str, "%H:%M").time()
+        if time < min_time or time > max_time:
+            return False
+        return bool(match)
+    except Exception as e:
+        return False
+
+
+def is_valid_time(time_str: str) -> bool:
+    try:
+        match = re.match(r"^(0?[0-9]|1[0-9]|2[0-3]):([0-5][0-9])$", time_str)
+        min_time = datetime_time(hour=0)
+        max_time = datetime_time(hour=23)
+
+        time = datetime.strptime(time_str, "%H:%M").time()
+        if time < min_time or time > max_time:
+            return False
+        return bool(match)
+    except Exception as e:
+        return False

@@ -1,19 +1,20 @@
+from datetime import datetime
+from enum import Enum as PyEnum
+
 from sqlalchemy import (
+    Boolean,
     Column,
-    Integer,
-    String,
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
+    String,
     Time,
     UniqueConstraint,
-    Boolean,
 )
 from sqlalchemy.orm import relationship
 
 from database import Base
-from datetime import datetime
-from enum import Enum as PyEnum
 
 
 class UserRole(PyEnum):
