@@ -2,12 +2,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 
 import text_constants
 from database import get_db
-from db_utils import get_user_notifications
+from utils.db_utils import get_user_notifications
 
 
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
-        [[text_constants.TRAINING, text_constants.SETTINGS]],
+        [[text_constants.TRAINING]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )

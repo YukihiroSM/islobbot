@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Date, DateTime, and_, cast, func, select
+from sqlalchemy import Date, DateTime, cast, select
 from sqlalchemy.orm import Session, joinedload
 
 import text_constants

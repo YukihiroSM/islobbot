@@ -1,4 +1,5 @@
 import datetime
+import os
 import re
 from datetime import time as datetime_time
 from random import shuffle
@@ -7,7 +8,8 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 from database import get_db
-from db_utils import is_active_user, is_admin_user
+from utils.db_utils import is_active_user, is_admin_user
+from config import BASE_DIR
 
 
 def payment_restricted(func):
@@ -41,7 +43,7 @@ def admin_restricted(func):
 
 
 def get_random_motivation_message():
-    with open("motivational_messages.txt", "r", encoding="UTF-8") as input_file:
+    with open(os.path.join(BASE_DIR, "motivational_messages.txt"), "r", encoding="UTF-8") as input_file:
         lines = input_file.read().split("\n")
         shuffle(lines)
         return f"Трішки мотивації тобі: \n{lines[0]}"

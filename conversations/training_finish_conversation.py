@@ -1,60 +1,24 @@
-import asyncio
-import datetime
 import logging
-import re
-import time
-from datetime import datetime
-from datetime import time as datetime_time
-from datetime import timedelta
 from enum import Enum, auto
-from ssl import get_default_verify_paths
-
-import schedule
-from sqlalchemy.exc import DataError
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
 from telegram.ext import (
-    ApplicationBuilder,
-    CallbackContext,
-    CallbackQueryHandler,
     CommandHandler,
-    ContextTypes,
     ConversationHandler,
     MessageHandler,
     filters,
 )
 
-import keyboards
+from utils import keyboards
 import text_constants
-from bot_utils import get_random_motivation_message, is_valid_morning_time
-from config import ADMIN_CHAT_IDS, BOT_TOKEN, DATABASE_URL, timezone
+from utils.bot_utils import get_random_motivation_message
+from config import ADMIN_CHAT_IDS
 from database import get_db
-from db_utils import (
-    add_or_update_user,
-    create_training_notifications,
-    get_notifications_by_type,
-    get_notifications_to_send_by_time,
+from utils.db_utils import (
     get_user_by_chat_id,
-    get_user_notification_by_time,
-    get_users_with_yesterday_trainings,
-    is_user_had_morning_quiz_today,
-    is_user_ready_to_use,
-    save_morning_quiz_results,
-    save_user_notification_preference,
-    start_user_training,
     stop_training,
-    toggle_user_notification,
-    update_notification_sent,
-    update_training_after_quiz,
     update_training_notification,
-    update_user_full_name,
-    update_user_notification_preference_admin_message_sent,
-    update_user_notification_preference_next_execution,
-    update_user_notification_time,
 )
-from keyboards import default_one_to_ten_keyboard, main_menu_keyboard, yes_no_keyboard
-from main import cancel, start, training_menu, main_menu
-from models import NotificationType
-from text_constants import YES_NO_BUTTONS
+from utils.commands import cancel
+from utils.menus import training_menu, main_menu
 
 
 class TrainingFinishQuiz(Enum):

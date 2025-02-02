@@ -1,59 +1,34 @@
 import datetime
 import logging
 from datetime import datetime
-from datetime import time as datetime_time
 from datetime import timedelta
-from enum import Enum, auto
 
-from sqlalchemy.exc import DataError
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CallbackContext,
-    CallbackQueryHandler,
-    CommandHandler,
-    ContextTypes,
-    ConversationHandler,
     MessageHandler,
     filters,
 )
 
 import conversations
-import keyboards
-import text_constants
-from bot_utils import (
+from utils import keyboards
+from utils.bot_utils import (
     get_random_motivation_message,
-    is_valid_morning_time,
-    is_valid_time,
 )
 from config import ADMIN_CHAT_IDS, BOT_TOKEN, timezone
-from conversations.training_start_conversation import handle_training_startup
 from database import get_db
-from db_utils import (
-    add_or_update_user,
-    create_training_notifications,
+from utils.db_utils import (
     get_notifications_by_type,
     get_notifications_to_send_by_time,
-    get_user_by_chat_id,
-    get_user_notification_by_time,
     get_users_with_yesterday_trainings,
-    is_user_had_morning_quiz_today,
-    is_user_ready_to_use,
-    save_morning_quiz_results,
-    save_user_notification_preference,
-    start_user_training,
-    stop_training,
-    toggle_user_notification,
     update_notification_sent,
-    update_training_after_quiz,
-    update_training_notification,
-    update_user_full_name,
     update_user_notification_preference_admin_message_sent,
     update_user_notification_preference_next_execution,
-    update_user_notification_time,
 )
-from keyboards import default_one_to_ten_keyboard, main_menu_keyboard, yes_no_keyboard
 from models import NotificationType
+import utils.menus
+
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -63,229 +38,6 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with next(get_db()) as db_session:
-        context.user_data["menu_state"] = "starting_using_bot"
-        is_new_user = add_or_update_user(
-            update.effective_user.id, update.effective_user.username, db_session
-        )
-
-        if is_new_user or not is_user_ready_to_use(
-            update.effective_user.id, db_session
-        ):
-            await update.message.reply_text(
-                "Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
-            )
-            await update.message.reply_text("Для початку, введіть своє повне ім'я.")
-            return conversations.intro_conversation.IntroConversation.GET_NAME
-        else:
-            await update.message.reply_text(
-                f"Привіт, {update.effective_user.username}!",
-                reply_markup=main_menu_keyboard(),
-            )
-
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Операція зупинена.", reply_markup=main_menu_keyboard()
-    )
-
-    return ConversationHandler.END
-
-
-async def settings_menu(update, context):
-    context.user_data["menu_state"] = "settings_menu"
-    await update.message.reply_text(
-        "Меню налаштувань. Оберіть, що ви бажаєте налаштувати:",
-        reply_markup=keyboards.settings_menu_keyboard(),
-    )
-
-
-async def configure_notifications_menu(update, context):
-    context.user_data["menu_state"] = "notifications_menu"
-    await update.message.reply_text(
-        "Конфігурація сповіщень. Оберіть, що бажаєте налаштувати:",
-        reply_markup=keyboards.notification_configuration_keyboard(),
-    )
-
-
-async def main_menu(update, context):
-    context.user_data["menu_state"] = "main_menu"
-    await update.message.reply_text(
-        "Головне меню:", reply_markup=keyboards.main_menu_keyboard()
-    )
-
-
-async def switch_notifications(update, context):
-    context.user_data["menu_state"] = "switch_notifications"
-    await update.message.reply_text(
-        "Натисніть на сповіщення, щоб увімкнути / вимкнути:",
-        reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
-    )
-
-
-async def handle_notification_toggle(update, context):
-    user_input = update.message.text
-    with next(get_db()) as db_session:
-        notification_time_string = user_input.split(" - ")[0]
-        try:
-            notification = get_user_notification_by_time(
-                chat_id=update.effective_user.id,
-                time=notification_time_string,
-                db_session=db_session,
-            )
-        except DataError:
-            return
-
-        toggle_user_notification(notification_id=notification.id, db_session=db_session)
-        await context.bot.send_message(
-            chat_id=update.effective_user.id, text="Налаштування успішно застосовано!"
-        )
-        await switch_notifications(update, context)
-
-
-async def notification_time_change_menu(update, context):
-    context.user_data["menu_state"] = "change_notification_time"
-    await update.message.reply_text(
-        "Натисніть на сповіщення, щоб змінити його час спрацювання:",
-        reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
-    )
-
-
-async def handle_notification_time_change(update, context):
-    user_input = update.message.text
-    with next(get_db()) as db_session:
-        notification_time_string = user_input.split(" - ")[0]
-        try:
-            notification = get_user_notification_by_time(
-                chat_id=update.effective_user.id,
-                time=notification_time_string,
-                db_session=db_session,
-            )
-        except DataError:
-            return
-
-        if notification:
-            context.user_data["notification_to_change"] = notification.id
-            await update.message.reply_text(
-                "Введіть новий час для цього сповіщення у форматі '08:00'. Час має бути між 06:00 та 12:00."
-            )
-        else:
-            await update.message.reply_text(
-                "Сповіщення не знайдено. Спробуйте ще раз або поверніться назад."
-            )
-
-
-async def change_user_notification_time(update, context):
-    time_input = update.message.text
-    if not is_valid_morning_time(time_input):
-        await update.message.reply_text(
-            f"Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
-        )
-        return
-
-    with next(get_db()) as db_session:
-        notification_id = context.user_data.get("notification_to_change")
-        if notification_id:
-
-            hours, minutes = map(int, time_input.split(":")[:2])
-
-            datetime_now = datetime.now(tz=timezone)
-            datetime_time_input = timezone.localize(
-                datetime(
-                    datetime_now.year,
-                    datetime_now.month,
-                    datetime_now.day,
-                    hours,
-                    minutes,
-                )
-            )
-            if datetime_now < datetime_time_input:
-                next_execution_datetime = datetime_time_input
-            else:
-                next_execution_datetime = datetime_time_input + timedelta(days=1)
-
-            update_user_notification_time(
-                notification_id=notification_id,
-                new_time=time_input,
-                next_execution_datetime=next_execution_datetime,
-                db_session=db_session,
-            )
-            await update.message.reply_text(
-                "Час сповіщення успішно оновлено!",
-                reply_markup=keyboards.notification_configuration_keyboard(),
-            )
-            del context.user_data["notification_to_change"]
-        else:
-            await update.message.reply_text("Помилка: не вдалось знайти сповіщення.")
-
-
-async def training_menu(update, context):
-    context.user_data["menu_state"] = "training_menu"
-    await update.message.reply_text(
-        "Час поглянути на тренування!", reply_markup=keyboards.training_menu_keyboard()
-    )
-
-
-async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-
-    if not "menu_state" in context.user_data:
-        await main_menu(update, context)
-
-    # main menu handling
-    if user_input == text_constants.TRAINING:
-        await training_menu(update, context)
-
-    if user_input == text_constants.SETTINGS:
-        await settings_menu(update, context)
-
-    # settings menu handling
-
-    if user_input == text_constants.GO_BACK:
-        if context.user_data["menu_state"] == "settings_menu":
-            await main_menu(update, context)
-        if context.user_data["menu_state"] == "notifications_menu":
-            await settings_menu(update, context)
-        if context.user_data["menu_state"] == "switch_notifications":
-            await configure_notifications_menu(update, context)
-        if context.user_data["menu_state"] == "change_notification_time":
-            await configure_notifications_menu(update, context)
-        if context.user_data["menu_state"] == "training_menu":
-            await main_menu(update, context)
-
-    if user_input == text_constants.CONFIGURE_NOTIFICATIONS:
-        await configure_notifications_menu(update, context)
-
-    # Notifications config menu
-    if user_input == text_constants.TURN_ON_OFF_NOTIFICATIONS:
-        await switch_notifications(update, context)
-
-    if user_input == text_constants.CHANGE_NOTIFICATION_TIME:
-        await notification_time_change_menu(update, context)
-
-    # training menu handling
-
-    if (
-        context.user_data["menu_state"] == "training_menu"
-        and user_input == text_constants.START_TRAINING
-    ):
-        await handle_training_startup(update, context)
-
-    # handle anything else
-
-    if context.user_data["menu_state"] == "switch_notifications":
-        await handle_notification_toggle(update, context)
-
-    if context.user_data["menu_state"] == "change_notification_time":
-        if "notification_to_change" in context.user_data:
-            await change_user_notification_time(update, context)
-        else:
-            await handle_notification_time_change(update, context)
-
-    return
 
 
 async def send_morning_notification(context, user_id, admin_message_datetime):
@@ -475,7 +227,10 @@ if __name__ == "__main__":
     app.add_handler(
         conversations.after_training_conversation.after_training_quiz_conv_handler
     )
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
+    app.add_handler(
+        conversations.training_start_conversation.training_start_quiz_conv_handler
+    )
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, utils.menus.handle_menu))
     job_queue = app.job_queue
 
     # job_queue.run_repeating(send_scheduled_message, interval=10, first=0)

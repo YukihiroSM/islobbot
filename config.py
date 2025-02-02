@@ -12,3 +12,5 @@ DATABASE_URL = os.environ.get(
 ADMIN_CHAT_IDS = json.loads(os.environ.get("ADMIN_CHAT_IDS"))
 
 timezone = pytz.timezone("Europe/Kyiv")
+
+BASE_DIR = os.getcwd()

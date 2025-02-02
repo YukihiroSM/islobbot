@@ -3,7 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import CallbackContext
 
-from config import ADMIN_CHAT_ID
+from config import ADMIN_CHAT_IDS
 from exceptions import UserNotFoundError
 
 logging.basicConfig(
@@ -30,11 +30,12 @@ async def error_handler(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(msg="Unhandled exception:", exc_info=e)
 
-        if ADMIN_CHAT_ID:
-            await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=f"An unhandled error occurred: {e}",
-            )
+        if ADMIN_CHAT_IDS:
+            for admin_id in ADMIN_CHAT_IDS:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"An unhandled error occurred: {e}",
+                )
         if update and update.effective_chat:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
