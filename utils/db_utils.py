@@ -456,7 +456,7 @@ def update_notification_sent(notification_id, db_session):
     db_session.commit()
 
 
-def update_training_notification(chat_id, db_session):
+def update_training_stop_notification(chat_id, db_session):
     user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
     user_notification = (
         db_session.query(NotificationPreference)
@@ -465,6 +465,42 @@ def update_training_notification(chat_id, db_session):
             & (
                 NotificationPreference.notification_type
                 == NotificationType.STOP_TRAINING_NOTIFICATION
+            )
+        )
+        .first()
+    )
+    if user_notification:
+        user_notification.notification_sent = True
+        db_session.commit()
+
+
+def update_training_start_notification(chat_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    user_notification = (
+        db_session.query(NotificationPreference)
+        .filter(
+            (NotificationPreference.user == user)
+            & (
+                NotificationPreference.notification_type
+                == NotificationType.TRAINING_REMINDER_NOTIFICATION
+            )
+        )
+        .first()
+    )
+    if user_notification:
+        user_notification.notification_sent = True
+        db_session.commit()
+
+
+def update_pre_training_notification(chat_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(chat_id)).first()
+    user_notification = (
+        db_session.query(NotificationPreference)
+        .filter(
+            (NotificationPreference.user == user)
+            & (
+                NotificationPreference.notification_type
+                == NotificationType.PRE_TRAINING_REMINDER_NOTIFICATION
             )
         )
         .first()

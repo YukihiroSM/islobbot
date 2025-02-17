@@ -2,6 +2,7 @@ import datetime
 import logging
 from datetime import datetime
 from datetime import timedelta
+from datetime import time as datetime_time
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -233,21 +234,21 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, utils.menus.handle_menu))
     job_queue = app.job_queue
 
-    # job_queue.run_repeating(send_scheduled_message, interval=10, first=0)
-    # after_training_quiz_scheduled_time = datetime_time(
-    #     hour=15, minute=0, tzinfo=timezone
-    # )
-    # job_queue.run_daily(
-    #     send_after_training_messages, time=after_training_quiz_scheduled_time
-    # )
-    #
-    # after_training_motivation_time = datetime_time(hour=18, minute=0, tzinfo=timezone)
-    # job_queue.run_daily(
-    #     get_evening_after_training_motivation, time=after_training_motivation_time
-    # )
-    #
-    # job_queue.run_repeating(get_pre_training_notifications, interval=10, first=0)
-    # job_queue.run_repeating(get_training_notifications, interval=10, first=0)
-    # job_queue.run_repeating(stop_training_notification, interval=10, first=0)
+    job_queue.run_repeating(send_scheduled_message, interval=10, first=0)
+    after_training_quiz_scheduled_time = datetime_time(
+        hour=15, minute=0, tzinfo=timezone
+    )
+    job_queue.run_daily(
+        send_after_training_messages, time=after_training_quiz_scheduled_time
+    )
+
+    after_training_motivation_time = datetime_time(hour=18, minute=0, tzinfo=timezone)
+    job_queue.run_daily(
+        get_evening_after_training_motivation, time=after_training_motivation_time
+    )
+
+    job_queue.run_repeating(get_pre_training_notifications, interval=10, first=0)
+    job_queue.run_repeating(get_training_notifications, interval=10, first=0)
+    job_queue.run_repeating(stop_training_notification, interval=10, first=0)
 
     app.run_polling()
