@@ -10,7 +10,7 @@ from utils import keyboards
 import text_constants
 from database import get_db
 from utils.db_utils import (
-    start_user_training,
+    start_user_training, update_training_start_notification, update_pre_training_notification,
 )
 from utils.commands import cancel
 from utils.menus import training_menu
@@ -66,7 +66,9 @@ async def handle_training_timer_start(update, context):
                 "Го го го!! Успіхів у тренуванні, тренування розпочато!",
                 reply_markup=keyboards.training_in_progress_keyboard(),
             )
-
+    with next(get_db()) as db_session:
+        update_training_start_notification(update.effective_chat.id, db_session)
+        update_pre_training_notification(update.effective_chat.id, db_session)
     return ConversationHandler.END
 
 
