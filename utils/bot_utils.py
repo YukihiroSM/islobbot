@@ -69,7 +69,7 @@ def is_valid_time(time_str: str) -> bool:
         min_time = datetime_time(hour=0)
         max_time = datetime_time(hour=23)
 
-        time = datetime.strptime(time_str, "%H:%M").time()
+        time = datetime.datetime.strptime(time_str, "%H:%M").time()
         if time < min_time or time > max_time:
             return False
         return bool(match)
