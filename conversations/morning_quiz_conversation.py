@@ -1,4 +1,3 @@
-import datetime
 from datetime import datetime
 from enum import Enum, auto
 from telegram import Update
@@ -41,8 +40,8 @@ async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ):
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
-                text=f"Ви вже проходили ранкове опитування сьогодні!",
-                reply_markup=main_menu_keyboard(),
+                text="Ви вже проходили ранкове опитування сьогодні!",
+                reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
             return ConversationHandler.END
 
@@ -126,7 +125,7 @@ async def retrieve_morning_is_going_to_have_training(update, context):
             f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
             f"Тренування сьогодні не планується! \n "
             f"Гарного дня!",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(update.effective_chat.id),
         )
         return ConversationHandler.END
 
@@ -170,7 +169,7 @@ async def retrieve_morning_training_time(update, context):
         f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
         f"Тренування сьогодні планується о {user_input}! \n "
         f"Гарного дня!",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
     return ConversationHandler.END
 

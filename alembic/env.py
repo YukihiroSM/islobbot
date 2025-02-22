@@ -7,7 +7,6 @@ from config import DATABASE_URL
 
 print(DATABASE_URL)
 
-import os
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

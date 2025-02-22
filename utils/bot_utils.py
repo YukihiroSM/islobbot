@@ -59,7 +59,7 @@ def is_valid_morning_time(time_str: str) -> bool:
         if time < min_time or time > max_time:
             return False
         return bool(match)
-    except Exception as e:
+    except Exception:
         return False
 
 
@@ -73,5 +73,5 @@ def is_valid_time(time_str: str) -> bool:
         if time < min_time or time > max_time:
             return False
         return bool(match)
-    except Exception as e:
+    except Exception:
         return False

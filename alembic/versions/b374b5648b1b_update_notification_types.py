@@ -8,8 +8,6 @@ Create Date: 2025-01-20 21:10:33.194618
 
 from typing import Sequence, Union
 
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ENUM
 
 from alembic import op
 

@@ -1,8 +1,9 @@
-import datetime
 import logging
-from datetime import datetime
-from datetime import timedelta
-from datetime import time as datetime_time
+from datetime import (
+    datetime,
+    timedelta,
+    time as datetime_time
+)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -52,7 +53,7 @@ async def send_morning_notification(context, user_id, admin_message_datetime):
             reply_markup=keyboards.start_morning_quiz_keyboard(),
         )
         return True
-    except:
+    except Exception:
         today = datetime.now(tz=timezone).date()
         if not admin_message_datetime or (
             admin_message_datetime and admin_message_datetime.date() != today
@@ -199,7 +200,7 @@ async def send_stop_training_notifications(context, notification):
     try:
         await context.bot.send_message(
             chat_id=notification.user.chat_id,
-            text=f"Привіт! Твоє тренування триває вже більше години. Не забув завершити?",
+            text="Привіт! Твоє тренування триває вже більше години. Не забув завершити?",
         )
         with next(get_db()) as db_session:
             update_notification_sent(notification.id, db_session)

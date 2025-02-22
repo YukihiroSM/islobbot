@@ -31,13 +31,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(
                 f"Привіт, {update.effective_user.username}!",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Операція зупинена.", reply_markup=main_menu_keyboard()
+        "Операція зупинена.", reply_markup=main_menu_keyboard(update.effective_chat.id)
     )
 
     return ConversationHandler.END

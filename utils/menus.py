@@ -6,7 +6,6 @@ import conversations
 from utils import keyboards
 from utils.notification_utils import (
     switch_notifications,
-    handle_notification_toggle,
     change_user_notification_time,
     handle_notification_time_change,
 )
@@ -31,7 +30,7 @@ async def configure_notifications_menu(update, context):
 async def main_menu(update, context):
     context.user_data["menu_state"] = "main_menu"
     await update.message.reply_text(
-        "Головне меню:", reply_markup=keyboards.main_menu_keyboard()
+        "Головне меню:", reply_markup=keyboards.main_menu_keyboard(update.effective_chat.id)
     )
 
 
@@ -53,7 +52,7 @@ async def training_menu(update, context):
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
 
-    if not "menu_state" in context.user_data:
+    if "menu_state" not in context.user_data:
         await main_menu(update, context)
 
     # main menu handling

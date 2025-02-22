@@ -5,9 +5,11 @@ from database import get_db
 from utils.db_utils import get_user_notifications
 
 
-def main_menu_keyboard():
+def main_menu_keyboard(chat_id):
+    keyboard = [[text_constants.TRAINING]]
+
     return ReplyKeyboardMarkup(
-        [[text_constants.TRAINING]],
+        keyboard,
         resize_keyboard=True,
         one_time_keyboard=True,
     )

@@ -69,7 +69,7 @@ async def change_user_notification_time(update, context):
     time_input = update.message.text
     if not is_valid_morning_time(time_input):
         await update.message.reply_text(
-            f"Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
+            "Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
         )
         return
 

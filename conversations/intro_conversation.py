@@ -1,4 +1,3 @@
-import datetime
 from datetime import datetime
 from datetime import timedelta
 from enum import Enum, auto
@@ -74,12 +73,12 @@ async def get_morning_notification_time(
 
             await update.message.reply_text(
                 "Супер! Налаштування завершено! Тепер очікуй від бота сповіщень у вказаний час!",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
             return ConversationHandler.END
     else:
         await update.message.reply_text(
-            f"Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
+            "Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
         )
         return IntroConversation.GET_TIME
 

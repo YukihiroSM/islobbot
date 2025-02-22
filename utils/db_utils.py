@@ -85,7 +85,6 @@ def is_admin_user(chat_id: int, db: Session):
     if not user:
         raise UserNotFoundError(chat_id)
     if user.role == UserRole.ADMIN:
-
         return True
 
     return False
@@ -217,7 +216,6 @@ def start_user_training(chat_id: int, user_state_mark: str, db_session: Session)
         notification_preference.is_active = True
         notification_preference.notification_sent = False
         notification_preference.next_execution_datetime = next_execution_datetime
-        is_created = False
     else:
         notification_preference = NotificationPreference(
             user_id=user.id,
@@ -433,7 +431,6 @@ def create_training_notifications(chat_id, notification_time, db_session):
             notification_preference.is_active = True
             notification_preference.notification_sent = False
             notification_preference.next_execution_datetime = next_execution_datetime
-            is_created = False
         else:
             notification_preference = NotificationPreference(
                 user_id=user.id,

@@ -73,7 +73,7 @@ async def retrieve_after_training_second_answer(update, context):
         )
     await update.message.reply_text(
         text="Дякую, що пройшли опитування! Гарного продовження дня!",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
     return ConversationHandler.END
 
