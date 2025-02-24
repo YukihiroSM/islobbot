@@ -505,3 +505,20 @@ def update_pre_training_notification(chat_id, db_session):
     if user_notification:
         user_notification.notification_sent = True
         db_session.commit()
+
+
+def set_training_pdf_message_id(pdf_user_id, message_id, chat_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(pdf_user_id)).first()
+
+    training_pdf_message_str = f"{message_id};{chat_id}"
+    user.training_pdf_message_id = training_pdf_message_str
+    db_session.commit()
+
+
+def get_training_pdf_message_data(user_id, db_session):
+    user = db_session.query(User).filter_by(chat_id=str(user_id)).first()
+
+    if user.training_pdf_message_id:
+        training_pdf_data = user.training_pdf_message_id.split(";")[:2]
+        return training_pdf_data
+    return None, None

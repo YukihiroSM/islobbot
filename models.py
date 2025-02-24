@@ -66,6 +66,7 @@ class User(Base):
         Enum(UserPaymentStatus), nullable=False, default=UserPaymentStatus.ACTIVE
     )
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
+    training_pdf_message_id = Column(String, default=None, nullable=True)
 
     notification_preferences = relationship(
         "NotificationPreference",

@@ -4,4 +4,5 @@ from . import (
     training_start_conversation,
     training_finish_conversation,
     after_training_conversation,
+    pdf_assignment_conversation
 )

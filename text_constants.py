@@ -1,6 +1,6 @@
 SETTINGS = "🛠 Налаштування"
 TRAINING = "🏅 Тренування"
-TRAINING_PDF = "Призначення тренування"
+TRAINING_PDF = "🛠 Призначення тренування"
 CONFIGURE_NOTIFICATIONS = "🔔 Налаштування сповіщень"
 GO_BACK = "◀️ Назад"
 CHANGE_NOTIFICATION_TIME = "🕒 Змінити час сповіщень"

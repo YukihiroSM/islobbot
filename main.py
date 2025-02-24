@@ -232,7 +232,9 @@ if __name__ == "__main__":
     app.add_handler(
         conversations.training_start_conversation.training_start_quiz_conv_handler
     )
+    app.add_handler(conversations.pdf_assignment_conversation.pdf_assignment_conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, utils.menus.handle_menu))
+
     job_queue = app.job_queue
 
     job_queue.run_repeating(send_scheduled_message, interval=10, first=0)

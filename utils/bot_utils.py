@@ -8,7 +8,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 from database import get_db
-from utils.db_utils import is_active_user, is_admin_user
+from utils.db_utils import is_active_user, is_admin_user, get_all_users
 from config import BASE_DIR
 
 
@@ -75,3 +75,15 @@ def is_valid_time(time_str: str) -> bool:
         return bool(match)
     except Exception:
         return False
+
+
+def get_user_list_as_buttons(action):
+    with next(get_db()) as db_session:
+        buttons = []
+        users = get_all_users(db_session)
+        for user in users:
+            user_id = user.chat_id
+            user_full_name = user.full_name
+            user_username = user.username
+            buttons.append([f"{user_full_name} ({user_username}) - {user_id} action:{action}"])
+    return buttons
