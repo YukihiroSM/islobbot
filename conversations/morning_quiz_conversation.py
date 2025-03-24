@@ -164,7 +164,7 @@ async def retrieve_morning_training_time(update, context):
         text=text_constants.MORNING_QUIZ_FINAL_WITH_TRAINING.format(
             hours_amount=context.user_data["morning_sleep_time"],
             feeling_mark=context.user_data["morning_feelings"],
-            training_time=expected_training_datetime.time,
+            training_time=expected_training_datetime.time(),
         ),
         reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
