@@ -10,6 +10,7 @@ from telegram.ext import CallbackContext
 from database import get_db
 from utils.db_utils import is_active_user, is_admin_user, get_all_users
 from config import BASE_DIR
+import text_constants
 
 
 def payment_restricted(func):
@@ -20,7 +21,7 @@ def payment_restricted(func):
         if not is_active_user(chat_id, db_session):
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="Доступ до бота обмежено. Вам потрібно уточнити дані стосовно оплати!",
+                text=text_constants.BOT_ACCESS_RESTRICTED_PAYMENT,
             )
             return
         await func(update, context)
@@ -34,7 +35,7 @@ def admin_restricted(func):
         db_session = next(get_db())
         if not is_admin_user(chat_id, db_session):
             await context.bot.send_message(
-                chat_id=chat_id, text="Доступ до цієї команди неможливий!"
+                chat_id=chat_id, text=text_constants.BOT_ACCESS_RESTRICTED_ADMIN
             )
             return
         await func(update, context)
@@ -43,10 +44,12 @@ def admin_restricted(func):
 
 
 def get_random_motivation_message():
-    with open(os.path.join(BASE_DIR, "motivational_messages.txt"), "r", encoding="UTF-8") as input_file:
+    with open(
+        os.path.join(BASE_DIR, "motivational_messages.txt"), "r", encoding="UTF-8"
+    ) as input_file:
         lines = input_file.read().split("\n")
         shuffle(lines)
-        return f"Трішки мотивації тобі: \n{lines[0]}"
+        return f"{text_constants.MOTIVATION_PREFIX} \n{lines[0]}"
 
 
 def is_valid_morning_time(time_str: str) -> bool:
@@ -85,5 +88,7 @@ def get_user_list_as_buttons(action):
             user_id = user.chat_id
             user_full_name = user.full_name
             user_username = user.username
-            buttons.append([f"{user_full_name} ({user_username}) - {user_id} action:{action}"])
+            buttons.append(
+                [f"{user_full_name} ({user_username}) - {user_id} action:{action}"]
+            )
     return buttons

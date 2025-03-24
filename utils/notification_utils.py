@@ -11,12 +11,13 @@ from utils.db_utils import (
     toggle_user_notification,
     update_user_notification_time,
 )
+import text_constants
 
 
 async def switch_notifications(update, context):
     context.user_data["menu_state"] = "switch_notifications"
     await update.message.reply_text(
-        "Натисніть на сповіщення, щоб увімкнути / вимкнути:",
+        text=text_constants.NOTIFICATION_TOGGLE_TEXT,
         reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
     )
 
@@ -36,7 +37,7 @@ async def handle_notification_toggle(update, context):
 
         toggle_user_notification(notification_id=notification.id, db_session=db_session)
         await context.bot.send_message(
-            chat_id=update.effective_user.id, text="Налаштування успішно застосовано!"
+            chat_id=update.effective_user.id, text=text_constants.SETTINGS_FINISHED
         )
         await switch_notifications(update, context)
 
@@ -57,26 +58,23 @@ async def handle_notification_time_change(update, context):
         if notification:
             context.user_data["notification_to_change"] = notification.id
             await update.message.reply_text(
-                "Введіть новий час для цього сповіщення у форматі '08:00'. Час має бути між 06:00 та 12:00."
+                text=text_constants.ENTER_NEW_NOTIFICATION_TIME_TEXT
             )
         else:
-            await update.message.reply_text(
-                "Сповіщення не знайдено. Спробуйте ще раз або поверніться назад."
-            )
+            await update.message.reply_text(text=text_constants.NOTIFICATION_NOT_FOUND)
 
 
 async def change_user_notification_time(update, context):
     time_input = update.message.text
     if not is_valid_morning_time(time_input):
         await update.message.reply_text(
-            "Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
+            text=text_constants.WRONG_MORNING_NOTIFICATION_TIME_FORMAT
         )
         return
 
     with next(get_db()) as db_session:
         notification_id = context.user_data.get("notification_to_change")
         if notification_id:
-
             hours, minutes = map(int, time_input.split(":")[:2])
 
             datetime_now = datetime.now(tz=timezone)
@@ -101,9 +99,11 @@ async def change_user_notification_time(update, context):
                 db_session=db_session,
             )
             await update.message.reply_text(
-                "Час сповіщення успішно оновлено!",
+                text=text_constants.NOTIFICATION_TIME_UPDATED,
                 reply_markup=keyboards.notification_configuration_keyboard(),
             )
             del context.user_data["notification_to_change"]
         else:
-            await update.message.reply_text("Помилка: не вдалось знайти сповіщення.")
+            await update.message.reply_text(
+                text=text_constants.NOTIFICATION_NOT_FOUND_TEXT
+            )

@@ -10,9 +10,7 @@ from config import ADMIN_CHAT_IDS
 def main_menu_keyboard(chat_id):
     keyboard = [[text_constants.TRAINING]]
     if str(chat_id) in ADMIN_CHAT_IDS:
-        keyboard.append(
-            [text_constants.TRAINING_PDF]
-        )
+        keyboard.append([text_constants.TRAINING_PDF])
     return ReplyKeyboardMarkup(
         keyboard,
         resize_keyboard=True,
@@ -127,8 +125,4 @@ def yes_no_keyboard():
 
 def pdf_user_list_keyboard():
     buttons = get_user_list_as_buttons("pdf_assignment")
-    return ReplyKeyboardMarkup(
-        buttons,
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
+    return ReplyKeyboardMarkup(buttons, resize_keyboard=True, one_time_keyboard=True)

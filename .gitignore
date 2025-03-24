@@ -1,4 +1,8 @@
 .env
-.venv
-.idea
+.venv/
+.idea/
 **/__pycache__/**
+__pycache__
+.ruff_cache
+venv/
+islob_bot.code-workspace

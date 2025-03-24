@@ -14,7 +14,7 @@ from utils.notification_utils import (
 async def settings_menu(update, context):
     context.user_data["menu_state"] = "settings_menu"
     await update.message.reply_text(
-        "Меню налаштувань. Оберіть, що ви бажаєте налаштувати:",
+        text=text_constants.SETTING_MENU_TEXT,
         reply_markup=keyboards.settings_menu_keyboard(),
     )
 
@@ -22,7 +22,7 @@ async def settings_menu(update, context):
 async def configure_notifications_menu(update, context):
     context.user_data["menu_state"] = "notifications_menu"
     await update.message.reply_text(
-        "Конфігурація сповіщень. Оберіть, що бажаєте налаштувати:",
+        text=text_constants.NOTIFICATION_MENU_TEXT,
         reply_markup=keyboards.notification_configuration_keyboard(),
     )
 
@@ -30,14 +30,15 @@ async def configure_notifications_menu(update, context):
 async def main_menu(update, context):
     context.user_data["menu_state"] = "main_menu"
     await update.message.reply_text(
-        "Головне меню:", reply_markup=keyboards.main_menu_keyboard(update.effective_chat.id)
+        text=text_constants.MAIN_MENU_TEXT,
+        reply_markup=keyboards.main_menu_keyboard(update.effective_chat.id),
     )
 
 
 async def notification_time_change_menu(update, context):
     context.user_data["menu_state"] = "change_notification_time"
     await update.message.reply_text(
-        "Натисніть на сповіщення, щоб змінити його час спрацювання:",
+        text=text_constants.CHANGE_NOTIFICATION_TIME_TEXT,
         reply_markup=keyboards.get_notifications_keyboard(update.effective_user.id),
     )
 
@@ -45,7 +46,8 @@ async def notification_time_change_menu(update, context):
 async def training_menu(update, context):
     context.user_data["menu_state"] = "training_menu"
     await update.message.reply_text(
-        "Час поглянути на тренування!", reply_markup=keyboards.training_menu_keyboard()
+        text=text_constants.TRAINING_MENU_TEXT,
+        reply_markup=keyboards.training_menu_keyboard(),
     )
 
 

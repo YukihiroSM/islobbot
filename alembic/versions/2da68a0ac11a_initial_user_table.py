@@ -1,7 +1,7 @@
 """Initial user table
 
 Revision ID: 2da68a0ac11a
-Revises: 
+Revises:
 Create Date: 2024-12-24 16:22:14.414160
 
 """

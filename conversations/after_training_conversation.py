@@ -32,7 +32,7 @@ async def run_after_training_quiz(update, context):
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Оцініть свій рівень стресу (1 - немає стресу, 10 - панічна атака):",
+        text=text_constants.STRESS_LEVEL_USER_MARK,
         reply_markup=default_one_to_ten_keyboard(),
     )
     return AfterTrainingQuiz.FIRST_QUESTION_ANSWER
@@ -43,14 +43,14 @@ async def retrieve_after_training_first_answer(update, context):
 
     if input_text not in text_constants.ONE_TO_TEN_MARKS:
         await update.message.reply_text(
-            text="Оцініть свій рівень стресу (1 - немає стресу, 10 - панічна атака):",
+            text=text_constants.STRESS_LEVEL_USER_MARK,
             reply_markup=default_one_to_ten_keyboard(),
         )
         return AfterTrainingQuiz.FIRST_QUESTION_ANSWER
 
     context.user_data["after_training_stress_level"] = input_text
     await update.message.reply_text(
-        text="Чи є у вас крепатура?", reply_markup=yes_no_keyboard()
+        text=text_constants.DO_YOU_HAVE_SORENESS, reply_markup=yes_no_keyboard()
     )
     return AfterTrainingQuiz.SECOND_QUESTION_ANSWER
 
@@ -60,7 +60,7 @@ async def retrieve_after_training_second_answer(update, context):
 
     if input_text not in text_constants.YES_NO_BUTTONS:
         await update.message.reply_text(
-            text="Чи є у вас крепатура?", reply_markup=yes_no_keyboard()
+            text=text_constants.DO_YOU_HAVE_SORENESS, reply_markup=yes_no_keyboard()
         )
         return AfterTrainingQuiz.SECOND_QUESTION_ANSWER
 
@@ -72,7 +72,7 @@ async def retrieve_after_training_second_answer(update, context):
             db_session=db_session,
         )
     await update.message.reply_text(
-        text="Дякую, що пройшли опитування! Гарного продовження дня!",
+        text=text_constants.THANKS_FOR_PASSING_QUIZ,
         reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
     return ConversationHandler.END
