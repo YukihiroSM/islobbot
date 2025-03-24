@@ -1,9 +1,5 @@
 import logging
-from datetime import (
-    datetime,
-    timedelta,
-    time as datetime_time
-)
+from datetime import datetime, timedelta, time as datetime_time
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -30,6 +26,7 @@ from utils.db_utils import (
 )
 from models import NotificationType
 import utils.menus
+import text_constants
 
 
 logging.basicConfig(
@@ -43,13 +40,10 @@ logger = logging.getLogger(__name__)
 
 
 async def send_morning_notification(context, user_id, admin_message_datetime):
-    morning_notification_text = (
-        "Привіт! Час пройти ранкове опитування! Натисни на кнопку, щоб почати"
-    )
     try:
         await context.bot.send_message(
             chat_id=user_id,
-            text=morning_notification_text,
+            text=text_constants.MORNING_NOTIFICATION_TEXT,
             reply_markup=keyboards.start_morning_quiz_keyboard(),
         )
         return True
@@ -61,7 +55,9 @@ async def send_morning_notification(context, user_id, admin_message_datetime):
             for chat_id in ADMIN_CHAT_IDS:
                 await context.bot.send_message(
                     chat_id=chat_id,
-                    text=f"Бот спробував надіслати користувачу {user_id} повідомлення, але користувач обмежив надсилання повідомлень!",
+                    text=text_constants.BOT_UNABLE_TO_SEND_MESSAGE.format(
+                        user_id=user_id
+                    ),
                 )
             return False
         return None
@@ -79,7 +75,6 @@ async def send_scheduled_message(context: CallbackContext):
                 context, user_id, notification.admin_warning_sent
             )
             if morning_notification_sent is True:
-
                 last_execution_datetime = datetime_now
                 next_execution_datetime = (
                     notification.next_execution_datetime + timedelta(days=1)
@@ -119,11 +114,10 @@ async def send_after_training_messages(context: CallbackContext):
 
 async def send_after_training_quiz_notifications(context, users_data):
     for user_id, training in users_data.items():
-        after_training_notification_text = f"Обєд! Час пройти опитування після тренування {str(training['training_start_date']).split('.')[0]}! Натисни на кнопку, аби розпочати"
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "Пройти опитування",
+                    text=text_constants.PASS_QUIZ,
                     callback_data=f"after_training_quiz:{training['training_id']}",
                 )
             ]
@@ -131,7 +125,9 @@ async def send_after_training_quiz_notifications(context, users_data):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=user_id,
-            text=after_training_notification_text,
+            text=text_constants.AFTER_TRAINING_NOTIFICATION_TEXT.format(
+                training_date=str(training["training_start_date"]).split(".")[0]
+            ),
             reply_markup=reply_markup,
         )
 
@@ -156,7 +152,9 @@ async def send_pre_training_notifications(context, notification):
     try:
         await context.bot.send_message(
             chat_id=notification.user.chat_id,
-            text=f"Нагадування про тренування о {notification.notification_time}",
+            text=text_constants.TRAINING_REMINDER_FIRST.format(
+                notification_time=notification.notification_time
+            ),
         )
         with next(get_db()) as db_session:
             update_notification_sent(notification.id, db_session)
@@ -178,7 +176,9 @@ async def send_training_notifications(context, notification):
     try:
         await context.bot.send_message(
             chat_id=notification.user.chat_id,
-            text=f"Привіт! Саме час розпочати тренування о {notification.notification_time}",
+            text=text_constants.TRAINING_REMINDER_SECOND.format(
+                notification_time=notification.notification_time
+            ),
         )
         with next(get_db()) as db_session:
             update_notification_sent(notification.id, db_session)
@@ -200,7 +200,7 @@ async def send_stop_training_notifications(context, notification):
     try:
         await context.bot.send_message(
             chat_id=notification.user.chat_id,
-            text="Привіт! Твоє тренування триває вже більше години. Не забув завершити?",
+            text=text_constants.TRAINING_MORE_THEN_HOUR,
         )
         with next(get_db()) as db_session:
             update_notification_sent(notification.id, db_session)
@@ -232,8 +232,12 @@ if __name__ == "__main__":
     app.add_handler(
         conversations.training_start_conversation.training_start_quiz_conv_handler
     )
-    app.add_handler(conversations.pdf_assignment_conversation.pdf_assignment_conv_handler)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, utils.menus.handle_menu))
+    app.add_handler(
+        conversations.pdf_assignment_conversation.pdf_assignment_conv_handler
+    )
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, utils.menus.handle_menu)
+    )
 
     job_queue = app.job_queue
 

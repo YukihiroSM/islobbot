@@ -11,6 +11,7 @@ from utils.db_utils import (
     is_user_ready_to_use,
 )
 from utils.keyboards import main_menu_keyboard
+import text_constants
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -23,14 +24,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_new_user or not is_user_ready_to_use(
             update.effective_user.id, db_session
         ):
-            await update.message.reply_text(
-                "Ласкаво прошу до бота! (Тут має бути якийсь невеличкий опис)"
-            )
-            await update.message.reply_text("Для початку, введіть своє повне ім'я.")
+            await update.message.reply_text(text=text_constants.BOT_DESCRIPTION)
+            await update.message.reply_text(text=text_constants.NAME_REQUEST)
             return conversations.intro_conversation.IntroConversation.GET_NAME
         else:
             await update.message.reply_text(
-                f"Привіт, {update.effective_user.username}!",
+                text=text_constants.FIRST_GREETING.format(
+                    username=update.effective_user.username
+                ),
                 reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
 

@@ -17,7 +17,7 @@ from utils.db_utils import (
     stop_training,
     update_training_stop_notification,
     update_training_start_notification,
-    update_pre_training_notification
+    update_pre_training_notification,
 )
 from utils.commands import cancel
 from utils.menus import training_menu, main_menu
@@ -32,14 +32,13 @@ async def handle_training_stop(update, context):
     if "training_id" not in context.user_data:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="Упс! Щось пішло не так під час старту тренування. Давай спробуємо ще раз)",
+            text=text_constants.TRAINING_START_GONE_WRONG,
         )
         await training_menu(update, context)
         return
     context.user_data["menu_state"] = "training_stopped"
     await update.message.reply_text(
-        "Супер! Ти справився! Давай оцінимо сьогоднішнє тренування:\n"
-        "Оціни, наскільки важке було тренування?",
+        text=text_constants.TRAINING_STOPPED,
         reply_markup=keyboards.training_first_question_marks_keyboard(),
     )
     return TrainingFinishQuiz.FIRST_QUESTION_ANSWER
@@ -49,14 +48,14 @@ async def handle_training_second_question(update, context):
     user_input = update.message.text
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
         await update.message.reply_text(
-            "Оціни, наскільки важке було тренування? (Оціни від 1 до 10, де 1 - погано, є симптоми хвороби, 10 - чудово себе почуваєш)",
+            text=text_constants.TRAINING_HARDNESS_MARK,
             reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return TrainingFinishQuiz.FIRST_QUESTION_ANSWER
     context.user_data["menu_state"] = "training_stopped_second_question"
     context.user_data["training_stop_first_question"] = user_input
     await update.message.reply_text(
-        "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
+        text_constants.HAVE_PAINS,
         reply_markup=keyboards.yes_no_keyboard(),
     )
     return TrainingFinishQuiz.SECOND_QUESTION_ANSWER
@@ -69,7 +68,7 @@ async def handle_training_finish(update, context):
         logging.info("Incorrect input")
         context.user_data["menu_state"] = "training_stopped_second_question"
         await update.message.reply_text(
-            "Оціни, чи відчуваєш ти якийсь дискомфорт/болі?",
+            text=text_constants.HAVE_PAINS,
             reply_markup=keyboards.yes_no_keyboard(),
         )
         return TrainingFinishQuiz.SECOND_QUESTION_ANSWER
@@ -86,7 +85,11 @@ async def handle_training_finish(update, context):
             for admin_chat_id in ADMIN_CHAT_IDS:
                 await context.bot.send_message(
                     chat_id=admin_chat_id,
-                    text=f"Користувач {user.full_name}(@{user.username}) - {user.chat_id} відчуває болі після тренування!",
+                    text=text_constants.USER_HAVE_PAINS.format(
+                        full_name=user.full_name,
+                        username=user.username,
+                        chat_id=user.chat_id,
+                    ),
                 )
 
     with next(get_db()) as db_session:
@@ -103,9 +106,10 @@ async def handle_training_finish(update, context):
         update_pre_training_notification(update.effective_chat.id, db_session)
 
     await context.bot.send_message(
-        text=f"Супер! Ти тренувався аж {str(training_duration).split('.')[0]}! \n\n"
-        f"{get_random_motivation_message()} \n\n"
-        f"Тепер час відпочити)",
+        text=text_constants.TRAINING_FINAL.format(
+            training_duration=str(training_duration).split(".")[0],
+            motivation_message=get_random_motivation_message(),
+        ),
         chat_id=update.effective_chat.id,
     )
     await main_menu(update, context)

@@ -11,10 +11,9 @@ import utils.db_utils
 from utils import keyboards
 import text_constants
 from database import get_db
-from utils.db_utils import (
-    get_training_pdf_message_data
-)
+from utils.db_utils import get_training_pdf_message_data
 from utils.commands import cancel
+
 
 class PDFAssignment(Enum):
     HANDLE_USER_CHOICE = auto()
@@ -23,8 +22,8 @@ class PDFAssignment(Enum):
 
 async def choose_user(update, context):
     await update.message.reply_text(
-        text="Оберіть користувача для призначення PDF",
-        reply_markup=keyboards.pdf_user_list_keyboard()
+        text=text_constants.CHOOSE_USER,
+        reply_markup=keyboards.pdf_user_list_keyboard(),
     )
     return PDFAssignment.HANDLE_USER_CHOICE
 
@@ -40,13 +39,13 @@ async def handle_user_choice(update, context):
         action = match.group(4)
         context.user_data["pdf_user_id"] = user_id
         await update.message.reply_text(
-            text=f"Оновлюємо PDF для користувача {full_name} - {username}. Надішліть PDF файл сюди.",
+            text=text_constants.UPDATING_PDF.format(
+                full_name=full_name, username=username
+            ),
         )
         return PDFAssignment.HANDLE_FILE_MESSAGE
     else:
-        await update.message.reply_text(
-            text="Unable to retrieve user data. Please, contact developer"
-        )
+        await update.message.reply_text(text=text_constants.UNABLE_TO_RECEIVE_USER_DATA)
         return ConversationHandler.END
 
 
@@ -54,7 +53,7 @@ async def handle_file_message(update, context):
     pdf_user_id = context.user_data.get("pdf_user_id")
     if not pdf_user_id:
         await update.message.reply_text(
-            text="Щось пішло не так. Спробуйте знову",
+            text=text_constants.SOMETHING_GONE_WRONG,
             reply_markup=keyboards.main_menu_keyboard(update.effective_chat.id),
         )
         return ConversationHandler.END
@@ -65,21 +64,25 @@ async def handle_file_message(update, context):
             pdf_user_id=pdf_user_id,
             message_id=message_id,
             chat_id=chat_id,
-            db_session=db_session
+            db_session=db_session,
         )
 
     with next(get_db()) as db_session:
-        training_pdf_message_id, training_pdf_chat_id = get_training_pdf_message_data(pdf_user_id, db_session)
+        training_pdf_message_id, training_pdf_chat_id = get_training_pdf_message_data(
+            pdf_user_id, db_session
+        )
 
-    await context.bot.send_message(chat_id=pdf_user_id, text="Вам призначено новий файл тренування.")
+    await context.bot.send_message(
+        chat_id=pdf_user_id, text=text_constants.NEW_TRAINING_FILE
+    )
     await context.bot.forward_message(
         chat_id=pdf_user_id,
         from_chat_id=training_pdf_chat_id,
-        message_id=training_pdf_message_id
+        message_id=training_pdf_message_id,
     )
 
     await update.message.reply_text(
-        text="PDF успішно призначено користувачу",
+        text=text_constants.PDF_FILE_ASSIGNED,
         reply_markup=keyboards.main_menu_keyboard(update.effective_chat.id),
     )
     return ConversationHandler.END
@@ -94,10 +97,16 @@ pdf_assignment_conv_handler = ConversationHandler(
     ],
     states={
         PDFAssignment.HANDLE_USER_CHOICE: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_choice,)
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND,
+                handle_user_choice,
+            )
         ],
         PDFAssignment.HANDLE_FILE_MESSAGE: [
-            MessageHandler(filters.ATTACHMENT & ~filters.COMMAND, handle_file_message,)
+            MessageHandler(
+                filters.ATTACHMENT & ~filters.COMMAND,
+                handle_file_message,
+            )
         ],
     },
     fallbacks=[CommandHandler("cancel", cancel)],

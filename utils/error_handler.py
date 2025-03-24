@@ -5,6 +5,7 @@ from telegram.ext import CallbackContext
 
 from config import ADMIN_CHAT_IDS
 from exceptions import UserNotFoundError
+import text_constants
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -21,7 +22,7 @@ async def error_handler(update: Update, context: CallbackContext):
         if update and update.effective_chat:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="Не знайдено вашого користувача в системі!",
+                text=text_constants.USER_NOT_FOUND,
             )
     except ValueError as e:
         logger.warning(f"ValueError: {e}")
@@ -39,5 +40,5 @@ async def error_handler(update: Update, context: CallbackContext):
         if update and update.effective_chat:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="An unexpected error occurred. Please try again.",
+                text=text_constants.SOMETHING_GONE_WRONG,
             )

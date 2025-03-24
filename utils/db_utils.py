@@ -50,11 +50,9 @@ def update_user_full_name(chat_id: int, full_name: str, db: Session):
 def is_user_ready_to_use(chat_id: int, db: Session):
     user = db.query(User).filter_by(chat_id=str(chat_id)).first()
     if not user:
-
         raise UserNotFoundError(chat_id)
 
     if not user.full_name:
-
         return False
 
     user_notifications = (
@@ -63,7 +61,6 @@ def is_user_ready_to_use(chat_id: int, db: Session):
         .first()
     )
     if not user_notifications:
-
         return False
 
     return True
@@ -74,7 +71,6 @@ def is_active_user(chat_id: int, db: Session):
     if not user:
         raise UserNotFoundError(chat_id)
     if user.payment_status == UserPaymentStatus.ACTIVE or user.role == UserRole.ADMIN:
-
         return True
 
     return False

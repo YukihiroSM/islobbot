@@ -40,14 +40,14 @@ async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ):
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
-                text="Ви вже проходили ранкове опитування сьогодні!",
+                text=text_constants.QUIZ_ALREADY_PASSED,
                 reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
             return ConversationHandler.END
 
         await context.bot.send_message(
             chat_id=update.effective_user.id,
-            text="Як ви себе почуваєте?",
+            text=text_constants.HOW_DO_YOU_FEEL,
             reply_markup=keyboards.default_one_to_ten_keyboard(),
         )
         return MorningQuizConversation.FIRST_QUESTION_ANSWER
@@ -57,7 +57,7 @@ async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAUL
     input_text = update.message.text
     if not input_text.isnumeric() or not (1 <= int(input_text) <= 10):
         await update.message.reply_text(
-            text="Як ви себе почуваєте? Оберіть один із варіантів нижче!",
+            text=text_constants.HOW_DO_YOU_FEEL_EXPLAINED,
             reply_markup=keyboards.default_one_to_ten_keyboard(),
         )
         return MorningQuizConversation.FIRST_QUESTION_ANSWER
@@ -65,7 +65,7 @@ async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAUL
     context.user_data["morning_feelings"] = input_text
 
     await update.message.reply_text(
-        text="Скільки годин ви поспали? Введіть час у форматі '08:00'",
+        text=text_constants.HOW_MUCH_SLEEP,
     )
     return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
@@ -77,13 +77,13 @@ async def retrieve_morning_sleep_hours(
 
     if not is_valid_time(input_text):
         await update.message.reply_text(
-            text="Скільки годин ви поспали? Введіть час у форматі '08:00'",
+            text=text_constants.HOW_MUCH_SLEEP,
         )
         return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
     context.user_data["morning_sleep_time"] = input_text
     await update.message.reply_text(
-        text="Чи плануєте ви сьогодні тренування?",
+        text=text_constants.IS_GOING_TO_TRAIN,
         reply_markup=keyboards.yes_no_keyboard(),
     )
 
@@ -95,7 +95,7 @@ async def retrieve_morning_is_going_to_have_training(update, context):
 
     if user_input not in text_constants.YES_NO_BUTTONS:
         await update.message.reply_text(
-            text="Чи плануєте ви сьогодні тренування?",
+            text=text_constants.IS_GOING_TO_TRAIN,
             reply_markup=keyboards.yes_no_keyboard(),
         )
         return MorningQuizConversation.IS_GOING_TO_HAVE_TRAINING
@@ -103,14 +103,12 @@ async def retrieve_morning_is_going_to_have_training(update, context):
     context.user_data["is_going_to_have_training"] = user_input
 
     if user_input == text_constants.YES_NO_BUTTONS[0]:
-
         await update.message.reply_text(
-            text="Введіть, о которій плануєте прийти на тренування? (Наприклад, '15:00')",
+            text=text_constants.WHEN_GOING_TO_TRAIN,
         )
         return MorningQuizConversation.WHEN_GOING_TO_HAVE_TRAINING
 
     with next(get_db()) as db_session:
-
         save_morning_quiz_results(
             user_id=update.effective_user.id,
             quiz_datetime=datetime.now(timezone),
@@ -120,11 +118,10 @@ async def retrieve_morning_is_going_to_have_training(update, context):
             is_going_to_have_training=context.user_data["is_going_to_have_training"],
         )
         await update.message.reply_text(
-            text=f"Дякую! Ваші дані збережено: \n "
-            f"Ви поспали: {context.user_data['morning_sleep_time']} \n "
-            f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
-            f"Тренування сьогодні не планується! \n "
-            f"Гарного дня!",
+            text=text_constants.MORNING_QUIZ_FINAL.format(
+                hours_amount=context.user_data["morning_sleep_time"],
+                feeling_mark=context.user_data["morning_feelings"],
+            ),
             reply_markup=main_menu_keyboard(update.effective_chat.id),
         )
         return ConversationHandler.END
@@ -135,7 +132,7 @@ async def retrieve_morning_training_time(update, context):
 
     if not is_valid_time(user_input):
         await update.message.reply_text(
-            text="Введіть, о которій плануєте почати тренування сьогодні? (Наприклад, '15:00')",
+            text=text_constants.WHEN_GOING_TO_TRAIN,
         )
         return MorningQuizConversation.WHEN_GOING_TO_HAVE_TRAINING
 
@@ -164,11 +161,11 @@ async def retrieve_morning_training_time(update, context):
         )
 
     await update.message.reply_text(
-        text=f"Дякую! Ваші дані збережено: \n "
-        f"Ви поспали: {context.user_data['morning_sleep_time']} \n "
-        f"Почуваєте себе на {context.user_data['morning_feelings']}! \n "
-        f"Тренування сьогодні планується о {user_input}! \n "
-        f"Гарного дня!",
+        text=text_constants.MORNING_QUIZ_FINAL_WITH_TRAINING.format(
+            hours_amount=context.user_data["morning_sleep_time"],
+            feeling_mark=context.user_data["morning_feelings"],
+            training_time=expected_training_datetime.time,
+        ),
         reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
     return ConversationHandler.END

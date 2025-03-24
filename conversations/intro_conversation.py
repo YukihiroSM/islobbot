@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+import text_constants
 from utils.bot_utils import is_valid_morning_time
 from config import timezone
 from database import get_db
@@ -34,9 +35,7 @@ async def get_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id, full_name=name, db=db_session
         )
         await update.message.reply_text(
-            f"Дякую, {name}! Тепер налаштуємо сповіщення. Введіть бажаний час для ранкового сповіщення. "
-            f"Його потрібно увести в форматі '08:00'. "
-            f"Введіть будь-який зручний час в рамках від 06:00 до 12:00! ",
+            text=text_constants.INTRO_CONVERSATION_FIRST_MEET.format(name=name)
         )
         return IntroConversation.GET_TIME
 
@@ -72,14 +71,12 @@ async def get_morning_notification_time(
             )
 
             await update.message.reply_text(
-                "Супер! Налаштування завершено! Тепер очікуй від бота сповіщень у вказаний час!",
+                text=text_constants.SETTINGS_FINISHED,
                 reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
             return ConversationHandler.END
     else:
-        await update.message.reply_text(
-            "Невірний формат. Введіть час у форматі '08:00' в рамках від 06:00 до 12:00!"
-        )
+        await update.message.reply_text(text=text_constants.INVALID_TIME_FORMAT)
         return IntroConversation.GET_TIME
 
 
