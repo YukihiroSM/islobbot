@@ -91,6 +91,10 @@ async def handle_training_finish(update, context):
                         chat_id=user.chat_id,
                     ),
                 )
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=text_constants.USER_HAVE_PAINS_CLIENT,
+            )
 
     with next(get_db()) as db_session:
         training_duration = stop_training(

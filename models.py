@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Time,
     UniqueConstraint,
+    Float,
 )
 from sqlalchemy.orm import relationship
 
@@ -110,6 +111,7 @@ class MorningQuiz(Base):
     user_feelings = Column(Integer, nullable=False)
     user_feelings_comment = Column(String, nullable=True)
     user_sleeping_hours = Column(Time, nullable=False)
+    user_weight = Column(Float, nullable=True)
     is_going_to_have_training = Column(Boolean, nullable=False, default=False)
     expected_training_datetime = Column(DateTime, nullable=True)
 
