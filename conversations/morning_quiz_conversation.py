@@ -29,6 +29,7 @@ from utils.commands import cancel
 class MorningQuizConversation(Enum):
     FIRST_QUESTION_ANSWER = auto()
     SECOND_QUESTION_ANSWER = auto()
+    WEIGHT_QUESTION_ANSWER = auto()
     IS_GOING_TO_HAVE_TRAINING = auto()
     WHEN_GOING_TO_HAVE_TRAINING = auto()
 
@@ -82,11 +83,28 @@ async def retrieve_morning_sleep_hours(
         return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
     context.user_data["morning_sleep_time"] = input_text
+
+    await update.message.reply_text(
+        text=text_constants.USER_WEIGHT,
+    )
+    return MorningQuizConversation.WEIGHT_QUESTION_ANSWER
+
+
+async def retrieve_user_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    input_text = update.message.text
+
+    if not input_text.isnumeric():
+        await update.message.reply_text(
+            text=text_constants.USER_WEIGHT,
+        )
+        return MorningQuizConversation.WEIGHT_QUESTION_ANSWER
+
+    context.user_data["user_weight"] = input_text
+
     await update.message.reply_text(
         text=text_constants.IS_GOING_TO_TRAIN,
         reply_markup=keyboards.yes_no_keyboard(),
     )
-
     return MorningQuizConversation.IS_GOING_TO_HAVE_TRAINING
 
 
@@ -114,12 +132,14 @@ async def retrieve_morning_is_going_to_have_training(update, context):
             quiz_datetime=datetime.now(timezone),
             user_feelings=context.user_data["morning_feelings"],
             user_sleeping_hours=context.user_data["morning_sleep_time"],
+            user_weight=context.user_data["user_weight"],
             db_session=db_session,
             is_going_to_have_training=context.user_data["is_going_to_have_training"],
         )
         await update.message.reply_text(
             text=text_constants.MORNING_QUIZ_FINAL.format(
                 hours_amount=context.user_data["morning_sleep_time"],
+                user_weight=context.user_data["user_weight"],
                 feeling_mark=context.user_data["morning_feelings"],
             ),
             reply_markup=main_menu_keyboard(update.effective_chat.id),
@@ -150,6 +170,7 @@ async def retrieve_morning_training_time(update, context):
             user_sleeping_hours=context.user_data["morning_sleep_time"],
             db_session=db_session,
             is_going_to_have_training=context.user_data["is_going_to_have_training"],
+            user_weight=context.user_data["user_weight"],
             expected_training_datetime=expected_training_datetime,
         )
 
@@ -164,6 +185,7 @@ async def retrieve_morning_training_time(update, context):
         text=text_constants.MORNING_QUIZ_FINAL_WITH_TRAINING.format(
             hours_amount=context.user_data["morning_sleep_time"],
             feeling_mark=context.user_data["morning_feelings"],
+            user_weight=context.user_data["user_weight"],
             training_time=expected_training_datetime.time(),
         ),
         reply_markup=main_menu_keyboard(update.effective_chat.id),
@@ -181,6 +203,9 @@ morning_quiz_conv_handler = ConversationHandler(
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND, retrieve_morning_sleep_hours
             )
+        ],
+        MorningQuizConversation.WEIGHT_QUESTION_ANSWER: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, retrieve_user_weight)
         ],
         MorningQuizConversation.IS_GOING_TO_HAVE_TRAINING: [
             MessageHandler(

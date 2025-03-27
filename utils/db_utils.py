@@ -295,6 +295,7 @@ def save_morning_quiz_results(
     quiz_datetime,
     user_feelings,
     user_sleeping_hours,
+    user_weight,
     db_session,
     is_going_to_have_training,
     expected_training_datetime=None,
@@ -308,6 +309,7 @@ def save_morning_quiz_results(
         quiz_datetime=quiz_datetime,
         user_feelings=user_feelings,
         user_sleeping_hours=user_sleeping_hours,
+        user_weight=user_weight,
     )
     if is_going_to_have_training == text_constants.YES_NO_BUTTONS[0]:
         morning_quiz.is_going_to_have_training = True
