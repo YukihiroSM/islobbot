@@ -1,4 +1,5 @@
 from datetime import datetime
+import datetime as dt
 from enum import Enum, auto
 from telegram import Update
 from telegram.ext import (
@@ -24,6 +25,7 @@ from utils.db_utils import (
 )
 from utils.keyboards import main_menu_keyboard
 from utils.commands import cancel
+import re
 
 
 class MorningQuizConversation(Enum):
@@ -76,13 +78,29 @@ async def retrieve_morning_sleep_hours(
 ):
     input_text = update.message.text
 
-    if not is_valid_time(input_text):
+    if not isinstance(input_text, str):
         await update.message.reply_text(
             text=text_constants.HOW_MUCH_SLEEP,
         )
         return MorningQuizConversation.SECOND_QUESTION_ANSWER
 
-    context.user_data["morning_sleep_time"] = input_text
+    time_pattern = re.compile(r"^\s*(\d{1,2})\s*[:.,]?\s*(\d{0,2})?\s*$")
+    match = time_pattern.match(input_text)
+    print(match)
+    if not match:
+        await update.message.reply_text(
+            text=text_constants.HOW_MUCH_SLEEP,
+        )
+        return MorningQuizConversation.SECOND_QUESTION_ANSWER
+
+    hours, minutes = match.groups()
+    print(hours, minutes)
+    if "," in input_text or "." in input_text:
+        minutes = int(60 * int(minutes) / (10 ** len(minutes)))
+    else:
+        minutes = int(minutes) or 0
+    print(hours, minutes)
+    context.user_data["morning_sleep_time"] = dt.time(hour=int(hours), minute=minutes)
 
     await update.message.reply_text(
         text=text_constants.USER_WEIGHT,
@@ -92,14 +110,19 @@ async def retrieve_morning_sleep_hours(
 
 async def retrieve_user_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
     input_text = update.message.text
-
-    if not input_text.isnumeric():
+    weight = re.findall(r"[\d.,]+", input_text)
+    if not weight:
         await update.message.reply_text(
             text=text_constants.USER_WEIGHT,
         )
         return MorningQuizConversation.WEIGHT_QUESTION_ANSWER
-
-    context.user_data["user_weight"] = input_text
+    weight = weight[0].replace(",", ".")
+    if not weight.replace(".", "", 1).isdigit():
+        await update.message.reply_text(
+            text=text_constants.USER_WEIGHT,
+        )
+        return MorningQuizConversation.WEIGHT_QUESTION_ANSWER
+    context.user_data["user_weight"] = float(weight)
 
     await update.message.reply_text(
         text=text_constants.IS_GOING_TO_TRAIN,
