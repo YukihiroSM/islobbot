@@ -1,0 +1,742 @@
+0001: <!DOCTYPE html>
+0002: <html lang="uk">
+0003: <head>
+0004:     <meta charset="UTF-8">
+0005:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+0006:     <title>Статистика тренувань - Владислав</title>
+0007:     <link rel="stylesheet" href="styles.css">
+0008:     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+0009:     <style>
+0010:         :root {
+0011:             --stress-color: #FFD700;
+0012:             --hardness-color: #FF0000;
+0013:             --sleep-color: #9370DB;
+0014:             --feelings-color: #00FF00;
+0015:             --weight-color: #00BFFF;
+0016:             --background-color: #E6E9F0;
+0017:             --card-background: #FFFFFF;
+0018:             --card-shadow: 0 4px 12px rgba(0,0,0,0.1);
+0019:             --border-radius: 20px;
+0020:         }
+0021:         
+0022:         body {
+0023:             font-family: 'Arial', sans-serif;
+0024:             background-color: var(--background-color);
+0025:             margin: 0;
+0026:             padding: 20px;
+0027:         }
+0028:         
+0029:         .container {
+0030:             max-width: 1200px;
+0031:             margin: 0 auto;
+0032:             padding: 20px;
+0033:         }
+0034:         
+0035:         .summary-box {
+0036:             background-color: var(--card-background);
+0037:             border-radius: var(--border-radius);
+0038:             padding: 20px;
+0039:             margin-bottom: 30px;
+0040:             box-shadow: var(--card-shadow);
+0041:             display: flex;
+0042:             justify-content: space-around;
+0043:         }
+0044:         
+0045:         .metric {
+0046:             text-align: center;
+0047:             padding: 10px 20px;
+0048:         }
+0049:         
+0050:         .metric-value {
+0051:             font-size: 28px;
+0052:             font-weight: bold;
+0053:         }
+0054:         
+0055:         .metric-label {
+0056:             font-size: 14px;
+0057:             color: #666;
+0058:             margin-top: 5px;
+0059:         }
+0060:         
+0061:         .stats-grid {
+0062:             display: grid;
+0063:             grid-template-columns: repeat(2, 1fr);
+0064:             grid-template-rows: auto auto auto;
+0065:             gap: 25px;
+0066:         }
+0067:         
+0068:         .stats-card {
+0069:             background-color: var(--card-background);
+0070:             border-radius: var(--border-radius);
+0071:             overflow: hidden;
+0072:             box-shadow: var(--card-shadow);
+0073:             display: flex;
+0074:             flex-direction: column;
+0075:             aspect-ratio: 1 / 1;
+0076:         }
+0077:         
+0078:         .stats-card.wide {
+0079:             grid-column: span 2;
+0080:             aspect-ratio: 2 / 1;
+0081:         }
+0082:         
+0083:         .card-header {
+0084:             padding: 12px;
+0085:             text-align: center;
+0086:             color: white;
+0087:             font-weight: bold;
+0088:             border-radius: 30px;
+0089:             margin: 15px auto 5px;
+0090:             width: 80%;
+0091:             max-width: 200px;
+0092:         }
+0093:         
+0094:         .card-header h2 {
+0095:             margin: 0;
+0096:             font-size: 18px;
+0097:             text-transform: uppercase;
+0098:             letter-spacing: 1px;
+0099:         }
+0100:         
+0101:         .card-body {
+0102:             padding: 15px;
+0103:             flex-grow: 1;
+0104:             display: flex;
+0105:             align-items: center;
+0106:             justify-content: center;
+0107:         }
+0108:         
+0109:         .chart-container {
+0110:             width: 100%;
+0111:             height: 100%;
+0112:             position: relative;
+0113:             padding: 10px;
+0114:             box-sizing: border-box;
+0115:         }
+0116:         
+0117:         /* Card header colors */
+0118:         /* .stress {
+0119:             background-color: var(--stress-color);
+0120:         }
+0121:         
+0122:         .hardness {
+0123:             background-color: var(--hardness-color);
+0124:         }
+0125:         
+0126:         .sleep {
+0127:             background-color: var(--sleep-color);
+0128:         }
+0129:         
+0130:         .feelings {
+0131:             background-color: var(--feelings-color);
+0132:         }
+0133:         
+0134:         .weight {
+0135:             background-color: var(--weight-color);
+0136:         } */
+0137:         
+0138:         /* Export button styles */
+0139:         .export-container {
+0140:             text-align: center;
+0141:             margin: 20px 0;
+0142:         }
+0143:         
+0144:         .export-button {
+0145:             background-color: #4CAF50;
+0146:             color: white;
+0147:             border: none;
+0148:             padding: 12px 24px;
+0149:             font-size: 16px;
+0150:             border-radius: 30px;
+0151:             cursor: pointer;
+0152:             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+0153:             transition: all 0.3s ease;
+0154:         }
+0155:         
+0156:         .export-button:hover {
+0157:             background-color: #45a049;
+0158:             transform: translateY(-2px);
+0159:             box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+0160:         }
+0161:         
+0162:         /* Mobile styles */
+0163:         @media (max-width: 768px) {
+0164:             .stats-grid {
+0165:                 grid-template-columns: 1fr;
+0166:             }
+0167:             
+0168:             .stats-card.wide {
+0169:                 grid-column: auto;
+0170:                 aspect-ratio: 1 / 1;
+0171:             }
+0172:             
+0173:             .summary-box {
+0174:                 flex-direction: column;
+0175:             }
+0176:         }
+0177:     </style>
+0178: </head>
+0179: <body>
+0180:     <div class="container">
+0181:         <h1>Статистика тренувань - Владислав</h1>
+0182:         <p>Період: custom (01.02 - 28.02)</p>
+0183:         
+0184:         <div class="summary-box">
+0185:             <div class="metric">
+0186:                 <div class="metric-value">6</div>
+0187:                 <div class="metric-label">Тренувань</div>
+0188:             </div>
+0189:             <div class="metric">
+0190:                 <div class="metric-value">7.2</div>
+0191:                 <div class="metric-label">Середня складність</div>
+0192:             </div>
+0193:             <div class="metric">
+0194:                 <div class="metric-value">3.0</div>
+0195:                 <div class="metric-label">Середній стрес</div>
+0196:             </div>
+0197:         </div>
+0198:         
+0199:         <div class="export-container">
+0200:             <button class="export-button" id="exportButton">Зберегти як зображення</button>
+0201:         </div>
+0202:         
+0203:         <div class="stats-grid" id="statsGrid">
+0204:             <!-- Стрес -->
+0205:             <div class="stats-card">
+0206:                 <div class="card-header stress">
+0207:                     <h2>СТРЕС</h2>
+0208:                 </div>
+0209:                 <div class="card-body">
+0210:                     <div class="chart-container">
+0211:                         <canvas id="stressChart"></canvas>
+0212:                     </div>
+0213:                 </div>
+0214:             </div>
+0215: 
+0216:             <!-- Складність -->
+0217:             <div class="stats-card">
+0218:                 <div class="card-header hardness">
+0219:                     <h2>СКЛАДНІСТЬ</h2>
+0220:                 </div>
+0221:                 <div class="card-body">
+0222:                     <div class="chart-container">
+0223:                         <canvas id="hardnessChart"></canvas>
+0224:                     </div>
+0225:                 </div>
+0226:             </div>
+0227: 
+0228:             <!-- Сон -->
+0229:             <div class="stats-card">
+0230:                 <div class="card-header sleep">
+0231:                     <h2>СОН</h2>
+0232:                 </div>
+0233:                 <div class="card-body">
+0234:                     <div class="chart-container">
+0235:                         <canvas id="sleepChart"></canvas>
+0236:                     </div>
+0237:                 </div>
+0238:             </div>
+0239: 
+0240:             <!-- Самопочуття -->
+0241:             <div class="stats-card">
+0242:                 <div class="card-header feelings">
+0243:                     <h2>САМОПОЧУТТЯ</h2>
+0244:                 </div>
+0245:                 <div class="card-body">
+0246:                     <div class="chart-container">
+0247:                         <canvas id="feelingsChart"></canvas>
+0248:                     </div>
+0249:                 </div>
+0250:             </div>
+0251:             
+0252:             <!-- Вага -->
+0253:             <div class="stats-card wide">
+0254:                 <div class="card-header weight">
+0255:                     <h2>ВАГА</h2>
+0256:                 </div>
+0257:                 <div class="card-body">
+0258:                     <div class="chart-container">
+0259:                         <canvas id="weightChart"></canvas>
+0260:                     </div>
+0261:                 </div>
+0262:             </div>
+0263:         </div>
+0264:     </div>
+0265: 
+0266:     <script>
+0267:         // Data from Python
+0268:         const sampleData = {"dates": ["01.02", "02.02", "03.02", "04.02", "05.02", "06.02", "07.02", "08.02", "09.02", "10.02", "11.02", "12.02", "13.02", "14.02", "15.02", "16.02", "17.02", "19.02", "20.02", "21.02", "22.02", "23.02", "24.02", "25.02", "26.02"], "stress": {"values": [null, null, null, null, null, 1, null, null, null, 3, null, 8, null, 1, null, null, 3, 2, null, null, null, null, null, null, null], "color": "#FFD700"}, "hardness": {"values": [null, null, null, null, null, 1, null, null, null, 8, null, 9, null, 10, null, null, 8, 7, null, null, null, null, null, null, null], "color": "#FF0000", "soreness": [false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, true, true, false, false, false, false, false, false, false]}, "sleep": {"values": [8.0, 7.0, 7.5, 8.0, 4.5, 8.0, 3.5, 7.5, 7.0, 5.0, 8.0, 5.0, 8.333333333333334, 5.0, 7.75, 6.0, 4.0, 5.0, 6.0, 8.0, 8.0, 8.0, 8.0, 6.0, 5.0], "color": "#9370DB"}, "feelings": {"values": [7, 5, 9, 7, 8, 6, 4, 4, 3, 6, 6, 6, 6, 7, 6, 6, 5, 5, 1, 1, 3, 4, 5, 6, 6], "color": "#00FF00"}};
+0269:         
+0270:         // Debug information
+0271:         console.log("Chart data loaded:", sampleData);
+0272:         
+0273:         // Common chart options
+0274:         const commonOptions = {
+0275:             responsive: true,
+0276:             maintainAspectRatio: false,
+0277:             plugins: {
+0278:                 legend: {
+0279:                     display: false
+0280:                 },
+0281:                 tooltip: {
+0282:                     enabled: true,
+0283:                     backgroundColor: 'rgba(255, 255, 255, 0.9)',
+0284:                     titleColor: '#333',
+0285:                     bodyColor: '#333',
+0286:                     borderColor: '#ddd',
+0287:                     borderWidth: 1,
+0288:                     cornerRadius: 6,
+0289:                     displayColors: false,
+0290:                     padding: 10,
+0291:                     callbacks: {
+0292:                         label: function(context) {
+0293:                             return context.parsed.y;
+0294:                         }
+0295:                     }
+0296:                 }
+0297:             },
+0298:             layout: {
+0299:                 padding: {
+0300:                     left: 20,
+0301:                     right: 20,
+0302:                     top: 20,
+0303:                     bottom: 20
+0304:                 }
+0305:             },
+0306:             scales: {
+0307:                 x: {
+0308:                     grid: {
+0309:                         display: true,
+0310:                         color: 'rgba(200, 200, 200, 0.15)',
+0311:                         borderDash: [5, 5],
+0312:                         drawBorder: false
+0313:                     },
+0314:                     ticks: {
+0315:                         font: {
+0316:                             size: 10
+0317:                         },
+0318:                         color: '#888',
+0319:                         maxRotation: 0,
+0320:                         padding: 5
+0321:                     }
+0322:                 },
+0323:                 y: {
+0324:                     beginAtZero: true,
+0325:                     grid: {
+0326:                         display: true,
+0327:                         color: 'rgba(200, 200, 200, 0.15)',
+0328:                         borderDash: [5, 5],
+0329:                         drawBorder: false
+0330:                     },
+0331:                     ticks: {
+0332:                         font: {
+0333:                             size: 10
+0334:                         },
+0335:                         color: '#888',
+0336:                         padding: 5,
+0337:                         stepSize: 1
+0338:                     }
+0339:                 }
+0340:             },
+0341:             elements: {
+0342:                 point: {
+0343:                     radius: 6,
+0344:                     hoverRadius: 8,
+0345:                     borderWidth: 0
+0346:                 },
+0347:                 line: {
+0348:                     tension: 0.4,
+0349:                     borderWidth: 3
+0350:                 },
+0351:                 bar: {
+0352:                     borderWidth: 0,
+0353:                     borderRadius: 4
+0354:                 }
+0355:             }
+0356:         };
+0357: 
+0358:         // Create stress chart (line chart with yellow line)
+0359:         const stressCtx = document.getElementById('stressChart').getContext('2d');
+0360:         console.log("Creating stress chart with data:", sampleData.dates, sampleData.stress.values);
+0361:         
+0362:         // Create gradient for stress chart background
+0363:         const stressGradient = stressCtx.createLinearGradient(0, 0, 0, 300);
+0364:         stressGradient.addColorStop(0, 'rgba(255, 215, 0, 0.1)');
+0365:         stressGradient.addColorStop(1, 'rgba(255, 215, 0, 0.0)');
+0366:         
+0367:         new Chart(stressCtx, {
+0368:             type: 'line',
+0369:             data: {
+0370:                 labels: sampleData.dates,
+0371:                 datasets: [{
+0372:                     data: sampleData.stress.values,
+0373:                     borderColor: '#FFD700', // Yellow
+0374:                     backgroundColor: stressGradient,
+0375:                     borderWidth: 3,
+0376:                     pointBackgroundColor: '#FFD700',
+0377:                     pointBorderColor: '#FFD700',
+0378:                     pointHoverBackgroundColor: '#FFD700',
+0379:                     pointHoverBorderColor: '#FFD700',
+0380:                     tension: 0.4,
+0381:                     fill: true,
+0382:                     spanGaps: true
+0383:                 }]
+0384:             },
+0385:             options: {
+0386:                 ...commonOptions,
+0387:                 scales: {
+0388:                     ...commonOptions.scales,
+0389:                     y: {
+0390:                         ...commonOptions.scales.y,
+0391:                         min: 0,
+0392:                         max: 10,
+0393:                         ticks: {
+0394:                             ...commonOptions.scales.y.ticks,
+0395:                             stepSize: 2
+0396:                         }
+0397:                     }
+0398:                 }
+0399:             }
+0400:         });
+0401: 
+0402:         // Create hardness chart with gradient fill
+0403:         const hardnessCtx = document.getElementById('hardnessChart').getContext('2d');
+0404:         console.log("Creating hardness chart with data:", sampleData.dates, sampleData.hardness.values);
+0405:         
+0406:         // Create gradient for hardness chart
+0407:         const hardnessGradient = hardnessCtx.createLinearGradient(0, 0, 0, 300);
+0408:         hardnessGradient.addColorStop(0, 'rgba(255, 0, 0, 0.3)');
+0409:         hardnessGradient.addColorStop(1, 'rgba(255, 0, 0, 0.0)');
+0410:         
+0411:         new Chart(hardnessCtx, {
+0412:             type: 'line',
+0413:             data: {
+0414:                 labels: sampleData.dates,
+0415:                 datasets: [{
+0416:                     data: sampleData.hardness.values,
+0417:                     borderColor: '#FF0000', // Red
+0418:                     backgroundColor: hardnessGradient,
+0419:                     borderWidth: 3,
+0420:                     pointBackgroundColor: '#FF0000',
+0421:                     pointBorderColor: '#FF0000',
+0422:                     pointHoverBackgroundColor: '#FF0000',
+0423:                     pointHoverBorderColor: '#FF0000',
+0424:                     tension: 0.4,
+0425:                     fill: true,
+0426:                     spanGaps: true
+0427:                 }]
+0428:             },
+0429:             options: {
+0430:                 ...commonOptions,
+0431:                 scales: {
+0432:                     ...commonOptions.scales,
+0433:                     y: {
+0434:                         ...commonOptions.scales.y,
+0435:                         min: 0,
+0436:                         max: 10,
+0437:                         ticks: {
+0438:                             ...commonOptions.scales.y.ticks,
+0439:                             stepSize: 2
+0440:                         }
+0441:                     }
+0442:                 }
+0443:             }
+0444:         });
+0445: 
+0446:         // Custom plugin to draw the sleep bars with rounded corners and proper styling
+0447:         const sleepBarsPlugin = {
+0448:             id: 'sleepBars',
+0449:             beforeDraw: (chart) => {
+0450:                 const {ctx, chartArea, scales} = chart;
+0451:                 const {top, bottom, left, width} = chartArea;
+0452:                 const barCount = sampleData.dates.length;
+0453:                 const barWidth = width / barCount * 0.5; // Thinner bars
+0454:                 const barOffset = width / barCount * 0.25; // Center the bars
+0455:                 
+0456:                 // Clear the canvas first
+0457:                 ctx.save();
+0458:                 ctx.globalCompositeOperation = 'destination-out';
+0459:                 ctx.fillRect(left, top, width, bottom - top);
+0460:                 ctx.restore();
+0461:                 
+0462:                 // Draw bars with rounded tops
+0463:                 for (let i = 0; i < barCount; i++) {
+0464:                     if (sampleData.sleep.values[i] === null) continue;
+0465:                     
+0466:                     const x = left + (width / barCount) * i + barOffset;
+0467:                     const value = sampleData.sleep.values[i];
+0468:                     const maxValue = 10; // Max value for scaling
+0469:                     const barHeight = (bottom - top) * (value / maxValue); // Scale to max value
+0470:                     
+0471:                     // Draw background bar (full height, light color)
+0472:                     ctx.fillStyle = 'rgba(147, 112, 219, 0.2)';
+0473:                     ctx.beginPath();
+0474:                     ctx.roundRect(x, top, barWidth, bottom - top, [4, 4, 0, 0]);
+0475:                     ctx.fill();
+0476:                     
+0477:                     // Draw the actual value bar
+0478:                     ctx.fillStyle = '#9370DB'; // Purple for the actual bar
+0479:                     ctx.beginPath();
+0480:                     ctx.roundRect(x, bottom - barHeight, barWidth, barHeight, [4, 4, 0, 0]);
+0481:                     ctx.fill();
+0482:                 }
+0483:             }
+0484:         };
+0485: 
+0486:         // Create sleep chart (bar chart)
+0487:         const sleepCtx = document.getElementById('sleepChart').getContext('2d');
+0488:         console.log("Creating sleep chart with data:", sampleData.dates, sampleData.sleep.values);
+0489:         new Chart(sleepCtx, {
+0490:             type: 'bar', // Using bar type but we'll override the drawing
+0491:             data: {
+0492:                 labels: sampleData.dates,
+0493:                 datasets: [{
+0494:                     data: sampleData.sleep.values,
+0495:                     backgroundColor: 'rgba(0,0,0,0)', // Transparent, we'll draw custom bars
+0496:                     borderColor: 'rgba(0,0,0,0)',
+0497:                     borderWidth: 0
+0498:                 }]
+0499:             },
+0500:             options: {
+0501:                 ...commonOptions,
+0502:                 scales: {
+0503:                     ...commonOptions.scales,
+0504:                     y: {
+0505:                         ...commonOptions.scales.y,
+0506:                         min: 0,
+0507:                         max: 10,
+0508:                         ticks: {
+0509:                             ...commonOptions.scales.y.ticks,
+0510:                             stepSize: 2
+0511:                         }
+0512:                     }
+0513:                 }
+0514:             },
+0515:             plugins: [sleepBarsPlugin]
+0516:         });
+0517: 
+0518:         // Create feelings chart with gradient
+0519:         const feelingsCtx = document.getElementById('feelingsChart').getContext('2d');
+0520:         console.log("Creating feelings chart with data:", sampleData.dates, sampleData.feelings.values);
+0521:         
+0522:         // Create gradient for feelings chart
+0523:         const feelingsGradient = feelingsCtx.createLinearGradient(0, 0, 0, 300);
+0524:         feelingsGradient.addColorStop(0, 'rgba(0, 255, 0, 0.1)');
+0525:         feelingsGradient.addColorStop(1, 'rgba(0, 255, 0, 0.0)');
+0526:         
+0527:         new Chart(feelingsCtx, {
+0528:             type: 'line',
+0529:             data: {
+0530:                 labels: sampleData.dates,
+0531:                 datasets: [{
+0532:                     data: sampleData.feelings.values,
+0533:                     borderColor: '#00FF00', // Green
+0534:                     backgroundColor: feelingsGradient,
+0535:                     borderWidth: 3,
+0536:                     pointBackgroundColor: '#00FF00',
+0537:                     pointBorderColor: '#00FF00',
+0538:                     pointHoverBackgroundColor: '#00FF00',
+0539:                     pointHoverBorderColor: '#00FF00',
+0540:                     tension: 0.4,
+0541:                     fill: true,
+0542:                     spanGaps: true
+0543:                 }]
+0544:             },
+0545:             options: {
+0546:                 ...commonOptions,
+0547:                 scales: {
+0548:                     ...commonOptions.scales,
+0549:                     y: {
+0550:                         ...commonOptions.scales.y,
+0551:                         min: 0,
+0552:                         max: 10,
+0553:                         ticks: {
+0554:                             ...commonOptions.scales.y.ticks,
+0555:                             stepSize: 2
+0556:                         }
+0557:                     }
+0558:                 }
+0559:             }
+0560:         });
+0561:         
+0562:         // Create weight chart with gradient
+0563:         const weightCtx = document.getElementById('weightChart').getContext('2d');
+0564:         
+0565:         // Create gradient for weight chart
+0566:         const weightGradient = weightCtx.createLinearGradient(0, 0, 0, 300);
+0567:         weightGradient.addColorStop(0, 'rgba(0, 191, 255, 0.7)');
+0568:         weightGradient.addColorStop(0.5, 'rgba(0, 191, 255, 0.3)');
+0569:         weightGradient.addColorStop(1, 'rgba(0, 191, 255, 0.0)');
+0570:         
+0571:         if (sampleData.weight && sampleData.weight.values) {
+0572:             console.log("Creating weight chart with data:", sampleData.dates, sampleData.weight.values);
+0573:             new Chart(weightCtx, {
+0574:                 type: 'line',
+0575:                 data: {
+0576:                     labels: sampleData.dates,
+0577:                     datasets: [{
+0578:                         data: sampleData.weight.values,
+0579:                         borderColor: '#00BFFF', // Deep Sky Blue
+0580:                         backgroundColor: weightGradient,
+0581:                         borderWidth: 3,
+0582:                         pointBackgroundColor: '#00BFFF',
+0583:                         pointBorderColor: '#00BFFF',
+0584:                         pointHoverBackgroundColor: '#00BFFF',
+0585:                         pointHoverBorderColor: '#00BFFF',
+0586:                         tension: 0.4,
+0587:                         fill: true,
+0588:                         spanGaps: true
+0589:                     }]
+0590:                 },
+0591:                 options: {
+0592:                     ...commonOptions,
+0593:                     scales: {
+0594:                         ...commonOptions.scales,
+0595:                         y: {
+0596:                             ...commonOptions.scales.y,
+0597:                             min: 0,
+0598:                             max: 100,
+0599:                             ticks: {
+0600:                                 ...commonOptions.scales.y.ticks,
+0601:                                 stepSize: 10
+0602:                             }
+0603:                         }
+0604:                     }
+0605:                 }
+0606:             });
+0607:         } else {
+0608:             console.log("No weight data available");
+0609:             // Display a message when no weight data is available
+0610:             weightCtx.font = "16px Arial";
+0611:             weightCtx.fillStyle = "#888";
+0612:             weightCtx.textAlign = "center";
+0613:             weightCtx.fillText("Немає даних про вагу", weightCtx.canvas.width/2, weightCtx.canvas.height/2);
+0614:         }
+0615:         
+0616:         // Export functionality
+0617:         document.getElementById('exportButton').addEventListener('click', function() {
+0618:             // Create a mobile-friendly layout for export
+0619:             createMobileImage();
+0620:         });
+0621:         
+0622:         function createMobileImage() {
+0623:             // Create a canvas for the mobile view
+0624:             const mobileCanvas = document.createElement('canvas');
+0625:             const ctx = mobileCanvas.getContext('2d');
+0626:             
+0627:             // Set canvas size for mobile (portrait orientation)
+0628:             const width = 1080; // Standard mobile width
+0629:             const height = 1920; // Taller height to fit all charts
+0630:             mobileCanvas.width = width;
+0631:             mobileCanvas.height = height;
+0632:             
+0633:             // Fill background
+0634:             ctx.fillStyle = '#E6E9F0';
+0635:             ctx.fillRect(0, 0, width, height);
+0636:             
+0637:             // Add title
+0638:             ctx.fillStyle = '#000';
+0639:             ctx.font = 'bold 40px Arial';
+0640:             ctx.textAlign = 'center';
+0641:             ctx.fillText(`Статистика тренувань - ${sampleData.user?.name || ""}`, width/2, 80);
+0642:             
+0643:             // Add period
+0644:             ctx.font = '30px Arial';
+0645:             ctx.fillText(`Період: ${sampleData.period?.start_date || ""} - ${sampleData.period?.end_date || ""}`, width/2, 130);
+0646:             
+0647:             // Add metrics
+0648:             const metrics = [
+0649:                 { label: 'Тренувань', value: sampleData.metrics?.trainings_count || 0 },
+0650:                 { label: 'Середня складність', value: sampleData.metrics?.avg_hardness || 0 },
+0651:                 { label: 'Середній стрес', value: sampleData.metrics?.avg_stress || 0 }
+0652:             ];
+0653:             
+0654:             // Draw metrics box
+0655:             const metricsBoxY = 160;
+0656:             const metricsBoxHeight = 150;
+0657:             drawRoundedRect(ctx, 50, metricsBoxY, width - 100, metricsBoxHeight, 20, '#FFFFFF');
+0658:             
+0659:             // Add metrics text
+0660:             ctx.fillStyle = '#000';
+0661:             const metricWidth = (width - 100) / 3;
+0662:             metrics.forEach((metric, i) => {
+0663:                 const x = 50 + (metricWidth * i) + (metricWidth / 2);
+0664:                 ctx.font = 'bold 50px Arial';
+0665:                 ctx.fillText(metric.value.toString(), x, metricsBoxY + 70);
+0666:                 ctx.font = '25px Arial';
+0667:                 ctx.fillText(metric.label, x, metricsBoxY + 110);
+0668:             });
+0669:             
+0670:             // Chart dimensions
+0671:             const chartWidth = width - 100;
+0672:             const chartHeight = 300;
+0673:             const chartSpacing = 30;
+0674:             let currentY = metricsBoxY + metricsBoxHeight + 50;
+0675:             
+0676:             // Draw each chart
+0677:             const charts = [
+0678:                 { name: 'СТРЕС', canvas: document.getElementById('stressChart'), color: '#FFD700' },
+0679:                 { name: 'СКЛАДНІСТЬ', canvas: document.getElementById('hardnessChart'), color: '#FF0000' },
+0680:                 { name: 'СОН', canvas: document.getElementById('sleepChart'), color: '#9370DB' },
+0681:                 { name: 'САМОПОЧУТТЯ', canvas: document.getElementById('feelingsChart'), color: '#00FF00' },
+0682:                 { name: 'ВАГА', canvas: document.getElementById('weightChart'), color: '#00BFFF' }
+0683:             ];
+0684:             
+0685:             charts.forEach(chart => {
+0686:                 // Draw chart background
+0687:                 drawRoundedRect(ctx, 50, currentY, chartWidth, chartHeight, 20, '#FFFFFF');
+0688:                 
+0689:                 // Draw chart title
+0690:                 drawRoundedRect(ctx, width/2 - 150, currentY - 20, 300, 40, 20, chart.color);
+0691:                 ctx.fillStyle = '#FFFFFF';
+0692:                 ctx.font = 'bold 25px Arial';
+0693:                 ctx.fillText(chart.name, width/2, currentY + 10);
+0694:                 
+0695:                 // Draw chart content
+0696:                 if (chart.canvas) {
+0697:                     ctx.drawImage(chart.canvas, 70, currentY + 30, chartWidth - 40, chartHeight - 60);
+0698:                 }
+0699:                 
+0700:                 // Move to next chart position
+0701:                 currentY += chartHeight + chartSpacing;
+0702:             });
+0703:             
+0704:             // Convert canvas to image and download
+0705:             const link = document.createElement('a');
+0706:             link.download = `Статистика_${new Date().toISOString().split('T')[0]}.png`;
+0707:             link.href = mobileCanvas.toDataURL('image/png');
+0708:             link.click();
+0709:         }
+0710:         
+0711:         // Helper function to draw rounded rectangles
+0712:         function drawRoundedRect(ctx, x, y, width, height, radius, color) {
+0713:             ctx.fillStyle = color;
+0714:             ctx.beginPath();
+0715:             ctx.moveTo(x + radius, y);
+0716:             ctx.lineTo(x + width - radius, y);
+0717:             ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+0718:             ctx.lineTo(x + width, y + height - radius);
+0719:             ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+0720:             ctx.lineTo(x + radius, y + height);
+0721:             ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+0722:             ctx.lineTo(x, y + radius);
+0723:             ctx.quadraticCurveTo(x, y, x + radius, y);
+0724:             ctx.closePath();
+0725:             ctx.fill();
+0726:             
+0727:             // Add shadow effect
+0728:             ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+0729:             ctx.shadowBlur = 10;
+0730:             ctx.shadowOffsetX = 0;
+0731:             ctx.shadowOffsetY = 5;
+0732:             ctx.fill();
+0733:             
+0734:             // Reset shadow
+0735:             ctx.shadowColor = 'transparent';
+0736:             ctx.shadowBlur = 0;
+0737:             ctx.shadowOffsetX = 0;
+0738:             ctx.shadowOffsetY = 0;
+0739:         }
+0740:     </script>
+0741: </body>
+0742: </html>
