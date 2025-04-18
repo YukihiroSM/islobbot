@@ -6,16 +6,18 @@
     <title>Статистика тренувань - {{ user.name }}</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --stress-color: #FFD700;
+            --stress-color: #e7c60f;
             --hardness-color: #FF0000;
             --sleep-color: #9370DB;
-            --feelings-color: #00FF00;
+            --feelings-color: #289828;
             --weight-color: #00BFFF;
-            --background-color: #E6E9F0;
+            --background-color: #87bbd2;
             --card-background: #FFFFFF;
-            --card-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            --card-shadow: 0 4px 12px rgba(108, 170, 199, 0.519);
             --border-radius: 20px;
         }
         
@@ -81,21 +83,26 @@
         }
         
         .card-header {
-            padding: 12px;
+            padding: 15px;
             text-align: center;
             color: white;
             font-weight: bold;
             border-radius: 30px;
-            margin: 15px auto 5px;
-            width: 80%;
-            max-width: 200px;
+            margin: 15px auto 10px;
+            width: 85%;
+            max-width: 220px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: translateY(-5px);
+            transition: all 0.3s ease;
         }
         
         .card-header h2 {
             margin: 0;
-            font-size: 18px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 22px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.723);
         }
         
         .card-body {
@@ -183,7 +190,7 @@
             <!-- Стрес -->
             <div class="stats-card">
                 <div class="card-header stress">
-                    <h2>СТРЕС</h2>
+                    <h2><b>СТРЕС</b></h2>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
@@ -195,7 +202,7 @@
             <!-- Складність -->
             <div class="stats-card">
                 <div class="card-header hardness">
-                    <h2>СКЛАДНІСТЬ</h2>
+                    <h2><b>СКЛАДНІСТЬ</b></h2>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
@@ -207,7 +214,7 @@
             <!-- Сон -->
             <div class="stats-card">
                 <div class="card-header sleep">
-                    <h2>СОН</h2>
+                    <h2><b>СОН</b></h2>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
@@ -219,7 +226,7 @@
             <!-- Самопочуття -->
             <div class="stats-card">
                 <div class="card-header feelings">
-                    <h2>САМОПОЧУТТЯ</h2>
+                    <h2><b>САМОПОЧУТТЯ</b></h2>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">
@@ -231,7 +238,7 @@
             <!-- Вага -->
             <div class="stats-card wide">
                 <div class="card-header weight">
-                    <h2>ВАГА</h2>
+                    <h2><b>ВАГА</b></h2>
                 </div>
                 <div class="card-body">
                     <div class="chart-container">

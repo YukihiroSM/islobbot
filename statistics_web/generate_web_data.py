@@ -46,16 +46,19 @@ def prepare_chart_data(df, value_column):
     if df.empty:
         return {"dates": [], "values": []}
     
-    # Sort by date in ascending order
+    # Sort by date in chronological order (ascending)
     df = df.sort_values("dt")
     
-    # Format dates for display
-    dates = [format_date(dt) for dt in df["dt"].tolist()]
-    values = df[value_column].tolist()
+    # Create a list of (datetime, formatted_date, value) tuples to maintain the connection
+    # between the original datetime and the formatted string
+    data_points = [(dt, format_date(dt), val) for dt, val in zip(df["dt"], df[value_column])]
     
-    # Reverse the order to show most recent data on the right
-    dates.reverse()
-    values.reverse()
+    # Don't reverse the order - we want oldest dates on the right
+    # (This is already in chronological order from the sort_values above)
+    
+    # Extract the formatted dates and values while maintaining their connection
+    dates = [point[1] for point in data_points]
+    values = [point[2] for point in data_points]
     
     return {
         "dates": dates,
@@ -158,15 +161,26 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     avg_stress = stats.get_average_stress()
     
     # Get all unique dates from all datasets to create a complete date array
-    all_dates = set()
+    all_dates_with_dt = []
     
     for df in [stress_df, sleep_df, hardness_df, feelings_df, weight_df]:  # Add weight_df
         if not df.empty:
             for dt in df["dt"]:
-                all_dates.add(format_date(dt))
+                formatted_date = format_date(dt)
+                # Store both the original datetime and the formatted string
+                all_dates_with_dt.append((dt, formatted_date))
     
-    # Sort the dates
-    all_dates = sorted(list(all_dates), reverse=True)
+    # Remove duplicates while preserving the datetime-string connection
+    unique_dates = {}
+    for dt, formatted_date in all_dates_with_dt:
+        unique_dates[formatted_date] = dt
+    
+    # Sort the dates chronologically by the original datetime, then reverse to show newest first
+    all_dates_with_dt = [(dt, formatted) for formatted, dt in unique_dates.items()]
+    all_dates_with_dt.sort(key=lambda x: x[0])  # Sort by datetime, oldest first
+    
+    # Extract just the formatted dates for display
+    all_dates = [date_tuple[1] for date_tuple in all_dates_with_dt]
     
     # Create arrays with values for each date, using null for missing values
     stress_values = []
