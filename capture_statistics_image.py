@@ -63,6 +63,12 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument(f"--window-size={window_width},{window_height}")
     
+    # Create a unique user data directory to avoid conflicts
+    import tempfile
+    import uuid
+    temp_dir = os.path.join(tempfile.gettempdir(), f"chrome_data_{uuid.uuid4().hex}")
+    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+    
     # Initialize the driver
     driver = webdriver.Chrome(options=chrome_options)
     

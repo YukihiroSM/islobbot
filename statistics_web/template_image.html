@@ -44,12 +44,50 @@
             border-radius: var(--border-radius);
             overflow: hidden;
             box-shadow: var(--card-shadow);
+            position: relative;
         }
         
         .card-header {
             padding: 15px;
             color: white;
             text-align: center;
+            display: none; /* Hide the original headers */
+        }
+        
+        .card-badge {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            z-index: 10;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .badge-stress {
+            background-color: var(--stress-color);
+            color: black;
+        }
+        
+        .badge-hardness {
+            background-color: var(--hardness-color);
+        }
+        
+        .badge-sleep {
+            background-color: var(--sleep-color);
+        }
+        
+        .badge-feelings {
+            background-color: var(--feelings-color);
+            color: black;
+        }
+        
+        .badge-weight {
+            background-color: var(--weight-color);
         }
         
         .card-header h2 {
@@ -103,6 +141,7 @@
         <div class="stats-grid" id="statsGrid">
             <!-- Стрес -->
             <div class="stats-card">
+                <div class="card-badge badge-stress">СТРЕС</div>
                 <div class="card-header stress">
                     <h2>СТРЕС</h2>
                 </div>
@@ -115,6 +154,7 @@
 
             <!-- Складність -->
             <div class="stats-card">
+                <div class="card-badge badge-hardness">СКЛАДНІСТЬ</div>
                 <div class="card-header hardness">
                     <h2>СКЛАДНІСТЬ</h2>
                 </div>
@@ -127,6 +167,7 @@
 
             <!-- Сон -->
             <div class="stats-card">
+                <div class="card-badge badge-sleep">СОН</div>
                 <div class="card-header sleep">
                     <h2>СОН</h2>
                 </div>
@@ -139,6 +180,7 @@
 
             <!-- Самопочуття -->
             <div class="stats-card">
+                <div class="card-badge badge-feelings">САМОПОЧУТТЯ</div>
                 <div class="card-header feelings">
                     <h2>САМОПОЧУТТЯ</h2>
                 </div>
@@ -149,9 +191,10 @@
                 </div>
             </div>
             
-            <!-- Вага (якщо є дані) -->
-            {% if weight_data and weight_data.dates|length > 0 %}
-            <div class="stats-card">
+            <!-- Вага -->
+            {% if weight_data %}
+            <div class="stats-card weight-card">
+                <div class="card-badge badge-weight">ВАГА</div>
                 <div class="card-header weight">
                     <h2>ВАГА</h2>
                 </div>

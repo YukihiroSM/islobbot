@@ -194,39 +194,65 @@ def generate_morning_quizzes(db: Session, users):
     
     # Assign a training pattern to each user
     user_patterns = {}
-    for user in users:
-        user_patterns[user.id] = random.choice(TRAINING_PATTERNS)
+    for i, user in enumerate(users):
+        pattern_index = i % len(TRAINING_PATTERNS)
+        user_patterns[user.id] = TRAINING_PATTERNS[pattern_index]
     
     # Generate data for each day in the 3-month period
     current_date = START_DATE
     while current_date <= CURRENT_DATE:
         for user in users:
-            # Skip some days randomly (80% completion rate)
+            # Skip some days randomly (20% skip rate)
             if random.random() < 0.8:
-                # Determine if today is a training day
+                # Check if today is a training day
                 day_of_week = current_date.weekday()
                 is_training_day = day_of_week in user_patterns[user.id]
                 
-                # Generate morning quiz
-                morning_time = time(random.randint(7, 9), random.randint(0, 59))
+                # Morning time (typically 6-9 AM)
+                # Different users have different morning routines
+                if user.chat_id == USER_CHAT_IDS[0]:  # First user
+                    morning_hour = random.randint(6, 8)  # Early riser
+                elif user.chat_id == USER_CHAT_IDS[1]:  # Second user
+                    morning_hour = random.randint(7, 9)  # Mid morning
+                else:  # Third user
+                    morning_hour = random.randint(5, 7)  # Very early riser
+                    
+                morning_minute = random.randint(0, 59)
+                morning_time = time(morning_hour, morning_minute)
                 
-                # User feelings vary but tend to be better on non-training days
-                # and worse after training days
-                base_feeling = 7  # Base feeling level
+                # Feeling (1-10)
+                # Different users have different baseline feelings
+                if user.chat_id == USER_CHAT_IDS[0]:  # First user
+                    feeling_base = 7  # Generally positive
+                elif user.chat_id == USER_CHAT_IDS[1]:  # Second user
+                    feeling_base = 6  # Slightly above average
+                else:  # Third user
+                    feeling_base = 8  # Very positive
+                    
+                feeling = random.randint(feeling_base - 2, feeling_base + 2)
+                feeling = max(1, min(10, feeling))  # Ensure within 1-10 range
                 
-                # If yesterday was a training day, slightly worse feeling
-                yesterday = current_date - timedelta(days=1)
-                if yesterday.weekday() in user_patterns[user.id]:
-                    base_feeling -= 1
-                
-                # Random variation
-                feeling = max(1, min(10, base_feeling + random.randint(-2, 2)))
-                
-                # Sleep hours - typically 6-8 hours
-                sleep_hours = time(random.randint(6, 8), random.randint(0, 59))
+                # Sleep hours (typically 6-9 hours)
+                # Different users have different sleep patterns
+                if user.chat_id == USER_CHAT_IDS[0]:  # First user
+                    sleep_hours_base = 7  # Average sleeper
+                elif user.chat_id == USER_CHAT_IDS[1]:  # Second user
+                    sleep_hours_base = 6  # Light sleeper
+                else:  # Third user
+                    sleep_hours_base = 8  # Good sleeper
+                    
+                sleep_hour = sleep_hours_base + random.randint(-1, 1)
+                sleep_minute = random.randint(0, 59)
+                sleep_hours = time(sleep_hour, sleep_minute)
                 
                 # Weight fluctuates slightly
-                base_weight = 75.0 if user.chat_id == USER_CHAT_IDS[0] else 65.0 if user.chat_id == USER_CHAT_IDS[1] else 70.0
+                if user.chat_id == USER_CHAT_IDS[0]:
+                    base_weight = 75.0  # First user
+                elif user.chat_id == USER_CHAT_IDS[1]:
+                    base_weight = 65.0  # Second user
+                else:
+                    base_weight = 70.0  # Third user
+                    
                 weight = round(base_weight + random.uniform(-1.0, 1.0), 1)
                 
                 # Create the quiz
@@ -287,11 +313,11 @@ def generate_training_data(db: Session, users):
                     # Training duration (30-90 minutes)
                     # Different users have different training durations
                     if user.chat_id == USER_CHAT_IDS[0]:  # First user
-                        duration_minutes = random.randint(45, 75)  # Longer workouts
+                        duration_minutes = random.randint(45, 59)  # Longer workouts
                     elif user.chat_id == USER_CHAT_IDS[1]:  # Second user
-                        duration_minutes = random.randint(30, 60)  # Medium workouts
+                        duration_minutes = random.randint(30, 59)  # Medium workouts
                     else:  # Third user
-                        duration_minutes = random.randint(40, 70)  # Varied workouts
+                        duration_minutes = random.randint(40, 59)  # Varied workouts
                         
                     training_duration = time(0, duration_minutes)
                     
