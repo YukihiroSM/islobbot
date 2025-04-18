@@ -1,47 +1,35 @@
 #!/usr/bin/env python3
 """
-Script to generate statistics image for a user based on their chat_id.
-This uses the existing statistics_web functionality to generate the HTML
-and then captures it as a PNG image.
+Script to capture statistics as an image.
 """
 
-import argparse
 import os
-import sys
-from datetime import datetime
-from pathlib import Path
 import json
+from datetime import datetime
+import time
+import tempfile
+import shutil
+import argparse
+import decimal
 
-import matplotlib
-matplotlib.use('Agg')
-
-# Add parent directory to path to import modules
-sys.path.append(str(Path(__file__).parent))
-
-# Import after path setup
-from statistics_web.generate_web_data import generate_html_from_data, get_statistics_data
-from utils.logger import get_logger
-from openai import OpenAI
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
-# Configure logger
-logger = get_logger(__name__)
-
-# Initialize OpenAI client
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-ASSISTANT_ID = os.environ.get("OPENAI_ASSISTANT_ID")
-
-# Import Selenium components
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time
 
+from openai import OpenAI
+from loguru import logger
+
+from statistics_web.generate_web_data import generate_html_from_data, get_statistics_data
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Set up OpenAI client
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+ASSISTANT_ID = os.environ.get("OPENAI_ASSISTANT_ID")
 
 def capture_html_screenshot(html_file, output_path, window_width=1200, window_height=1600):
     """
@@ -64,10 +52,15 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
     chrome_options.add_argument(f"--window-size={window_width},{window_height}")
     
     # Create a unique user data directory to avoid conflicts
-    import tempfile
-    import uuid
-    temp_dir = os.path.join(tempfile.gettempdir(), f"chrome_data_{uuid.uuid4().hex}")
+    temp_dir = tempfile.mkdtemp(prefix="chrome_data_")
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    
+    # For Heroku compatibility
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--remote-debugging-port=9222")
     
     # Initialize the driver
     driver = webdriver.Chrome(options=chrome_options)
@@ -85,16 +78,8 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
             EC.presence_of_element_located((By.CLASS_NAME, "chart-container"))
         )
         
-        # Give additional time for charts to fully render
+        # Additional wait for charts to fully render
         time.sleep(2)
-        
-        # Get the height of the content
-        body_height = driver.execute_script("return document.body.scrollHeight")
-        
-        # Adjust window height if needed
-        if body_height > window_height:
-            driver.set_window_size(window_width, body_height)
-            time.sleep(1)  # Allow time for resize
         
         # Take screenshot
         driver.save_screenshot(output_path)
@@ -102,7 +87,14 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
         
         return output_path
     finally:
+        # Close the driver
         driver.quit()
+        
+        # Clean up the temporary directory
+        try:
+            shutil.rmtree(temp_dir)
+        except Exception as e:
+            logger.error(f"Error cleaning up temporary directory: {e}")
 
 
 def analyze_metrics_with_assistant(stats_data, user_name):
@@ -127,7 +119,6 @@ def analyze_metrics_with_assistant(stats_data, user_name):
         # Create a custom JSON encoder to handle Decimal objects
         class DecimalEncoder(json.JSONEncoder):
             def default(self, obj):
-                import decimal
                 if isinstance(obj, decimal.Decimal):
                     return float(obj)
                 return super(DecimalEncoder, self).default(obj)
@@ -216,7 +207,7 @@ def generate_statistics_image(chat_id, period='monthly', start_date=None, end_da
         
         # Generate HTML directly from the data dictionary
         temp_html = os.path.join(output_dir, f"temp_{chat_id}.html")
-        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statistics_web/template.html')
+        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statistics_web/template_image.html')
         
         # Pass the dictionary directly to generate_html_from_data
         html_content = generate_html_from_data(
