@@ -115,7 +115,7 @@
         }
         
         /* Card header colors */
-        /* .stress {
+        .stress {
             background-color: var(--stress-color);
         }
         
@@ -133,7 +133,7 @@
         
         .weight {
             background-color: var(--weight-color);
-        } */
+        }
         
         /* Export button styles */
         .export-container {
@@ -711,82 +711,91 @@
         };
         const feelingsChart = createChart(feelingsCtx, feelingsConfig, 'самопочуття');
 
-        // Create weight chart with gradient
+        // Create weight chart (line chart with blue line)
         const weightCtx = document.getElementById('weightChart').getContext('2d');
+        console.log("Creating weight chart with data:", sampleData.dates, sampleData.weight.values);
         
         // Create gradient for weight chart
         const weightGradient = weightCtx.createLinearGradient(0, 0, 0, 300);
-        weightGradient.addColorStop(0, 'rgba(0, 191, 255, 0.7)');
+        weightGradient.addColorStop(0, 'rgba(0, 191, 255, 0.6)');
         weightGradient.addColorStop(0.5, 'rgba(0, 191, 255, 0.3)');
         weightGradient.addColorStop(1, 'rgba(0, 191, 255, 0.0)');
         
-        if (sampleData.weight && sampleData.weight.values) {
-            console.log("Creating weight chart with data:", sampleData.dates, sampleData.weight.values);
-            const weightConfig = {
-                type: 'line',
-                data: {
-                    labels: sampleData.dates,
-                    datasets: [{
-                        data: sampleData.weight.values,
-                        borderColor: '#00BFFF', // Deep Sky Blue
-                        backgroundColor: weightGradient,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#00BFFF',
-                        pointBorderColor: '#00BFFF',
-                        pointHoverBackgroundColor: '#00BFFF',
-                        pointHoverBorderColor: '#00BFFF',
-                        tension: 0.4,
-                        fill: true,
-                        spanGaps: true
-                    }]
-                },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: {
-                                display: false,
-                                text: 'Вага (кг)',
-                                color: '#000000',
-                                font: {
-                                    weight: 'bold',
-                                    size: 14
-                                }
-                            },
-                            ticks: {
-                                color: '#000000',
-                                font: {
-                                    weight: 'bold'
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
+        const weightConfig = {
+            type: 'line',
+            data: {
+                labels: sampleData.dates,
+                datasets: [{
+                    label: 'Вага',
+                    data: sampleData.weight.values,
+                    borderColor: '#00BFFF', // Deep Sky Blue
+                    backgroundColor: weightGradient,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#00BFFF',
+                    pointBorderColor: '#00BFFF',
+                    pointHoverBackgroundColor: '#00BFFF',
+                    pointHoverBorderColor: '#00BFFF',
+                    tension: 0.4,
+                    fill: true,
+                    spanGaps: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: {
+                            display: false,
+                            text: 'Вага (кг)',
+                            color: '#000000',
+                            font: {
+                                weight: 'bold',
+                                size: 14
                             }
                         },
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#000000',
-                                font: {
-                                    weight: 'bold'
-                                }
+                        ticks: {
+                            color: '#000000',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#000000',
+                            font: {
+                                weight: 'bold'
                             }
                         }
                     }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleFont: {
+                            size: 14
+                        },
+                        bodyFont: {
+                            size: 14
+                        },
+                        padding: 10,
+                        displayColors: false
+                    }
                 }
-            };
-            const weightChart = createChart(weightCtx, weightConfig, 'вагу');
-        } else {
-            console.log("No weight data available");
-            // Display a message when no weight data is available
-            weightCtx.font = "16px Arial";
-            weightCtx.fillStyle = "#888";
-            weightCtx.textAlign = "center";
-            weightCtx.fillText("Немає даних про вагу", weightCtx.canvas.width/2, weightCtx.canvas.height/2);
-        }
+            }
+        };
+        
+        const weightChart = createChart(weightCtx, weightConfig, 'Вага');
         
         // Export functionality
         document.getElementById('exportButton').addEventListener('click', function() {

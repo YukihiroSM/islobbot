@@ -7,33 +7,28 @@ import os
 import json
 from datetime import datetime
 import time
-import tempfile
-import shutil
 import argparse
 import decimal
+import subprocess
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-from openai import OpenAI
 from loguru import logger
 
+from openai import AsyncOpenAI
 from statistics_web.generate_web_data import generate_html_from_data, get_statistics_data
+from statistics_web.playwright_capture import capture_statistics_image
+
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
 # Set up OpenAI client
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 ASSISTANT_ID = os.environ.get("OPENAI_ASSISTANT_ID")
 
-def capture_html_screenshot(html_file, output_path, window_width=1200, window_height=1600):
+async def capture_html_screenshot(html_file, output_path, window_width=1200, window_height=1600):
     """
-    Capture a screenshot of an HTML file using Selenium
+    Capture a screenshot of an HTML file using a headless browser
     
     Args:
         html_file (str): Path to the HTML file
@@ -44,60 +39,135 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
     Returns:
         str: Path to the saved screenshot
     """
-    # Set up Chrome options
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument(f"--window-size={window_width},{window_height}")
-    
-    # Create a unique user data directory to avoid conflicts
-    temp_dir = tempfile.mkdtemp(prefix="chrome_data_")
-    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-software-rasterizer")
-    
-    # For Heroku compatibility
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--remote-debugging-port=9222")
-    
-    # Initialize the driver
-    driver = webdriver.Chrome(options=chrome_options)
-    
     try:
-        # Convert to absolute path and file:// URL format
+        # Get the absolute path of the HTML file
         abs_path = os.path.abspath(html_file)
-        file_url = f"file://{abs_path}"
         
-        # Load the HTML file
-        driver.get(file_url)
+        # Read the HTML content to extract the data
+        with open(abs_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+            
+        # Extract the JSON data from the HTML
+        # This is a simple approach - in a real implementation, you might want to use a more robust method
+        start_marker = "const sampleData = "
+        end_marker = ";"
         
-        # Wait for charts to render
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "chart-container"))
-        )
+        start_idx = html_content.find(start_marker) + len(start_marker)
+        end_idx = html_content.find(end_marker, start_idx)
         
-        # Additional wait for charts to fully render
-        time.sleep(2)
+        if start_idx > len(start_marker) and end_idx > start_idx:
+            json_str = html_content[start_idx:end_idx].strip()
+            try:
+                # Parse the JSON data
+                stats_data = json.loads(json_str)
+                
+                # Use our Playwright-based approach to generate the image
+                logger.info("Using Playwright to generate statistics image")
+                return await capture_statistics_image(stats_data, output_path, template_name="template.html")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON data from HTML: {e}")
+        else:
+            logger.error("Could not find chart data in HTML file")
+            
+        # Fallback to a simple approach if we couldn't extract the data
+        logger.warning("Using fallback method for capturing screenshot")
         
-        # Take screenshot
-        driver.save_screenshot(output_path)
-        logger.info(f"Statistics image saved to {output_path}")
+        # For Heroku, we need to use a different approach
+        # First, check if we're on Heroku by looking for the DYNO environment variable
+        if os.environ.get("DYNO"):
+            logger.info("Running on Heroku, using alternative screenshot method")
+            
+            # On Heroku, we'll use our Playwright-based approach with a placeholder
+            # Create a simple HTML file with a message
+            placeholder_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center; 
+                        height: 100vh; 
+                        background-color: #f0f0f0;
+                    }
+                    .message { 
+                        text-align: center; 
+                        padding: 20px; 
+                        background: white; 
+                        border-radius: 10px;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="message">
+                    <h2>Statistics Image</h2>
+                    <p>Your statistics are being processed.</p>
+                    <p>Please check back later.</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Write the placeholder HTML to a temporary file
+            temp_html = os.path.join(os.path.dirname(output_path), "placeholder.html")
+            with open(temp_html, "w") as f:
+                f.write(placeholder_html)
+                
+            # Use Playwright to capture the placeholder
+            try:
+                # Create an empty dictionary for the placeholder
+                return await capture_statistics_image({}, output_path, temp_html)
+            except Exception as e:
+                logger.error(f"Failed to capture placeholder with Playwright: {e}")
+                
+                # If all else fails, copy a static placeholder image
+                placeholder_path = os.path.join(os.path.dirname(__file__), "statistics_web", "placeholder.png")
+                if os.path.exists(placeholder_path):
+                    import shutil
+                    shutil.copy(placeholder_path, output_path)
+                    return output_path
+                else:
+                    logger.error("Placeholder image not found")
+                    return None
         
-        return output_path
-    finally:
-        # Close the driver
-        driver.quit()
-        
-        # Clean up the temporary directory
+        # If not on Heroku, try to use wkhtmltoimage
         try:
-            shutil.rmtree(temp_dir)
-        except Exception as e:
-            logger.error(f"Error cleaning up temporary directory: {e}")
+            logger.info(f"Capturing screenshot using wkhtmltoimage: {abs_path}")
+            subprocess.run([
+                "wkhtmltoimage",
+                "--width", str(window_width),
+                "--height", str(window_height),
+                "--quality", "100",
+                abs_path,
+                output_path
+            ], check=True)
+            
+            logger.info(f"Screenshot saved to {output_path}")
+            return output_path
+        except subprocess.CalledProcessError as e:
+            logger.error(f"wkhtmltoimage failed: {e}")
+            
+            # Try using Playwright as a fallback
+            try:
+                logger.info("Falling back to Playwright")
+                # Use the synchronous version that works within an event loop
+                
+                # Use the HTML file directly
+                return await capture_statistics_image({}, output_path, abs_path)
+            except Exception as e:
+                logger.error(f"Playwright fallback failed: {e}")
+                return None
+            
+    except Exception as e:
+        logger.error(f"Error capturing screenshot: {e}")
+        return None
 
 
-def analyze_metrics_with_assistant(stats_data, user_name):
+async def analyze_metrics_with_assistant(stats_data, user_name):
     """
     Analyze metrics using OpenAI Assistant and return text analysis.
     
@@ -127,17 +197,17 @@ def analyze_metrics_with_assistant(stats_data, user_name):
         metrics_json = json.dumps(stats_data, indent=2, ensure_ascii=False, cls=DecimalEncoder)
         
         # Create a thread
-        thread = client.beta.threads.create()
+        thread = await client.beta.threads.create()
         
         # Add a message to the thread
-        client.beta.threads.messages.create(
+        await client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=f"Будь ласка, проаналізуй ці фітнес-метрики та надай висновки щодо тренувальних звичок користувача, якості сну, рівня стресу та загального прогресу. Ось метрики:\n\n user_full_name: {user_name}\n{metrics_json}",
         )
         
         # Run the assistant
-        run = client.beta.threads.runs.create(
+        run = await client.beta.threads.runs.create(
             thread_id=thread.id, assistant_id=ASSISTANT_ID
         )
         
@@ -145,10 +215,10 @@ def analyze_metrics_with_assistant(stats_data, user_name):
         while run.status in ["queued", "in_progress"]:
             logger.debug(f"Assistant run status: {run.status}")
             time.sleep(1)
-            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            run = await client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
         
         if run.status == "completed":
-            messages = client.beta.threads.messages.list(thread_id=thread.id)
+            messages = await client.beta.threads.messages.list(thread_id=thread.id)
             analysis = messages.data[0].content[0].text.value
             logger.info(f"Received analysis from assistant: {analysis[:100]}...")
             return analysis
@@ -165,7 +235,7 @@ def analyze_metrics_with_assistant(stats_data, user_name):
         return error_msg
 
 
-def generate_statistics_image(chat_id, period='monthly', start_date=None, end_date=None, output_dir=None):
+async def generate_statistics_image(chat_id, period='monthly', start_date=None, end_date=None, output_dir=None):
     """
     Generate a statistics image for a user
     
@@ -203,41 +273,35 @@ def generate_statistics_image(chat_id, period='monthly', start_date=None, end_da
         
         # Generate AI analysis of the statistics
         user_name = stats_data.get('user', {}).get('name', f"User {chat_id}")
-        analysis = analyze_metrics_with_assistant(stats_data, user_name)
+        analysis = await analyze_metrics_with_assistant(stats_data, user_name)
         
         # Generate HTML directly from the data dictionary
         temp_html = os.path.join(output_dir, f"temp_{chat_id}.html")
-        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statistics_web/template_image.html')
-        
-        # Pass the dictionary directly to generate_html_from_data
-        html_content = generate_html_from_data(
-            data_path=stats_data,
-            template_path=template_path,
-            output_path=None,
-            for_image=True
-        )
-        
-        # Check if html_content is a PosixPath or string
-        if not isinstance(html_content, str):
-            logger.debug(f"html_content is not a string, it's a {type(html_content)}")
-            # If it's a path, read the content from the file
-            if hasattr(html_content, 'read_text'):
-                html_content = html_content.read_text()
-            elif hasattr(html_content, 'read'):
-                with open(html_content, 'r') as f:
-                    html_content = f.read()
-            else:
-                raise TypeError(f"Expected html_content to be a string or path, got {type(html_content)}")
-        
-        # Save HTML to temp file
-        with open(temp_html, 'w') as f:
-            f.write(html_content)
+        generate_html_from_data(stats_data, output_path=temp_html, for_image=True)
         
         # Capture screenshot
-        capture_html_screenshot(temp_html, output_path)
+        await capture_html_screenshot(temp_html, output_path)
         
-        # Clean up temp file
-        os.remove(temp_html)
+        # Clean up temp files
+        try:
+            # Remove the temporary HTML file
+            if os.path.exists(temp_html):
+                os.remove(temp_html)
+                logger.debug(f"Removed temporary HTML file: {temp_html}")
+            
+            # Remove any stats_image.html and stats_image_debug.html files
+            stats_image_html = os.path.join(os.path.dirname(__file__), "statistics_web", "stats_image.html")
+            stats_image_debug_html = os.path.join(os.path.dirname(__file__), "statistics_web", "stats_image_debug.html")
+            
+            if os.path.exists(stats_image_html):
+                os.remove(stats_image_html)
+                logger.debug(f"Removed stats_image.html file: {stats_image_html}")
+                
+            if os.path.exists(stats_image_debug_html):
+                os.remove(stats_image_debug_html)
+                logger.debug(f"Removed stats_image_debug.html file: {stats_image_debug_html}")
+        except Exception as e:
+            logger.warning(f"Error cleaning up temporary files: {e}")
         
         logger.info(f"Generated statistics image at: {output_path}")
         return output_path, analysis
@@ -249,7 +313,7 @@ def generate_statistics_image(chat_id, period='monthly', start_date=None, end_da
         return None, None
 
 
-def main():
+async def main():
     """Command line interface for generating statistics images"""
     parser = argparse.ArgumentParser(description='Generate statistics image for a user')
     parser.add_argument('--chat_id', type=int, required=True, help='User chat ID')
@@ -272,11 +336,11 @@ def main():
         data_path = get_statistics_data(args.chat_id, args.period, args.start_date, args.end_date)
         html_file = os.path.join(output_dir, f"stats_{args.chat_id}_temp.html")
         generate_html_from_data(data_path, output_path=html_file, for_image=True)
-        output_path = capture_html_screenshot(html_file, args.output)
+        output_path = await capture_html_screenshot(html_file, args.output)
         print(f"Statistics image saved to: {output_path}")
     else:
         # Use the function with directory
-        output_path, analysis = generate_statistics_image(
+        output_path, analysis = await generate_statistics_image(
             args.chat_id, 
             args.period, 
             args.start_date, 

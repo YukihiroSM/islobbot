@@ -117,7 +117,7 @@ async def select_period(update: Update, context: ContextTypes.DEFAULT_TYPE):
             start_date = end_date - datetime.timedelta(days=30)
 
         # Generate image and get AI analysis
-        image_path, analysis = generate_statistics_image(
+        image_path, analysis = await generate_statistics_image(
             chat_id=user_id,
             period=period,
             start_date=start_date.strftime("%Y-%m-%d"),

@@ -53,7 +53,7 @@ def prepare_chart_data(df, value_column):
     dates = [format_date(dt) for dt in df["dt"].tolist()]
     values = df[value_column].tolist()
     
-    # Reverse the order to show most recent data on the right side
+    # Reverse the order to show most recent data on the right
     dates.reverse()
     values.reverse()
     
@@ -131,6 +131,7 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     hardness_df = stats.get_training_hardness_data()
     feelings_df = stats.get_feelings_data()
     soreness_df = stats.get_soreness_data()
+    weight_df = stats.get_weight_data()  # Add weight data retrieval
     
     # Process soreness data to match the format needed for visualization
     soreness_dates = soreness_df["dt"].tolist() if not soreness_df.empty else []
@@ -140,6 +141,7 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     sleep_data = prepare_chart_data(sleep_df, "hours")
     hardness_data = prepare_chart_data(hardness_df, "hardness")
     feelings_data = prepare_chart_data(feelings_df, "feelings")
+    weight_data = prepare_chart_data(weight_df, "weight")  # Process weight data
     
     # Create soreness markers array that matches hardness dates
     soreness_markers = []
@@ -158,22 +160,20 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     # Get all unique dates from all datasets to create a complete date array
     all_dates = set()
     
-    for df in [stress_df, sleep_df, hardness_df, feelings_df]:
+    for df in [stress_df, sleep_df, hardness_df, feelings_df, weight_df]:  # Add weight_df
         if not df.empty:
             for dt in df["dt"]:
                 all_dates.add(format_date(dt))
     
     # Sort the dates
-    all_dates = sorted(list(all_dates))
-    
-    # Reverse the dates to show most recent data on the right
-    all_dates.reverse()
+    all_dates = sorted(list(all_dates), reverse=True)
     
     # Create arrays with values for each date, using null for missing values
     stress_values = []
     hardness_values = []
     sleep_values = []
     feelings_values = []
+    weight_values = []  # Add weight values array
     soreness_array = []
     
     # Map of date strings to original datetime objects for soreness checking
@@ -218,6 +218,13 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
             feelings_values.append(feelings_data["values"][idx])
         else:
             feelings_values.append(None)
+            
+        # Weight values
+        if date in weight_data["dates"]:
+            idx = weight_data["dates"].index(date)
+            weight_values.append(weight_data["values"][idx])
+        else:
+            weight_values.append(None)
     
     # Compile all data in the format expected by charts.js
     web_data = {
@@ -253,6 +260,10 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
             "feelings": {
                 "values": feelings_values,
                 "color": "#00FF00"  # Green
+            },
+            "weight": {
+                "values": weight_values,
+                "color": "#00BFFF"  # Blue
             }
         }
     }
@@ -303,6 +314,10 @@ def generate_data_file(user_id, start_date=None, end_date=None, period=None, out
         "feelings": {
             "values": data["charts"]["feelings"]["values"],
             "color": data["charts"]["feelings"]["color"]
+        },
+        "weight": {
+            "values": data["charts"]["weight"]["values"],
+            "color": data["charts"]["weight"]["color"]
         }
     }
     
@@ -453,6 +468,10 @@ def generate_html_from_data(data_path, template_path=None, output_path=None, for
         "feelings": {
             "values": data["charts"]["feelings"]["values"],
             "color": data["charts"]["feelings"]["color"]
+        },
+        "weight": {
+            "values": data["charts"]["weight"]["values"],
+            "color": data["charts"]["weight"]["color"]
         }
     }
     
@@ -493,16 +512,18 @@ def generate_html_from_data(data_path, template_path=None, output_path=None, for
         
         logger.info(f"Generated HTML file at: {output_path}")
         
-        # Also write a debug copy with line numbers
-        debug_output_path = str(output_path).replace(".html", "_debug.html")
-        with open(debug_output_path, "w", encoding="utf-8") as f:
-            lines = html_content.split("\n")
-            for i, line in enumerate(lines):
-                f.write(f"{i+1:04d}: {line}\n")
+        # Debug HTML file is only created if DEBUG_HTML environment variable is set
+        if os.environ.get("DEBUG_HTML"):
+            # Write a debug copy with line numbers
+            debug_output_path = str(output_path).replace(".html", "_debug.html")
+            with open(debug_output_path, "w", encoding="utf-8") as f:
+                lines = html_content.split("\n")
+                for i, line in enumerate(lines):
+                    f.write(f"{i+1:04d}: {line}\n")
+            
+            logger.info(f"Generated debug HTML file with line numbers at: {debug_output_path}")
         
-        logger.info(f"Generated debug HTML file with line numbers at: {debug_output_path}")
-        
-        return html_content
+        return output_path
     else:
         return html_content
 
