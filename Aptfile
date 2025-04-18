@@ -1,0 +1,15 @@
+# Aptfile
+libnss3
+libatk1.0-0
+libatk-bridge2.0-0
+libx11-6
+libx11-xcb1
+libxcb1
+libxcomposite1
+libxdamage1
+libxrandr2
+libxss1
+libgtk-3-0
+libasound2
+libpangocairo-1.0-0
+libatspi2.0-0
