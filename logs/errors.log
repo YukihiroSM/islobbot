@@ -1,0 +1,18 @@
+2025-04-18 03:03:32.287 | ERROR    | conversations.statistics_conversation:select_period:122 - Failed to generate statistics: 'dict' object has no attribute 'suffix'
+2025-04-18 03:05:01.887 | ERROR    | conversations.statistics_conversation:select_period:122 - Failed to generate statistics: 'dict' object has no attribute 'suffix'
+2025-04-18 03:07:25.737 | ERROR    | conversations.statistics_conversation:select_period:122 - Failed to generate statistics: expected str, bytes or os.PathLike object, not NoneType
+2025-04-18 03:09:34.652 | ERROR    | statistics_web.generate_web_data:get_statistics_data:84 - Invalid start_date format. Use YYYY-MM-DD.
+2025-04-18 03:09:34.653 | ERROR    | conversations.statistics_conversation:select_period:136 - Failed to generate statistics: expected str, bytes or os.PathLike object, not NoneType
+2025-04-18 03:10:30.138 | ERROR    | statistics_web.generate_web_data:get_statistics_data:84 - Invalid start_date format. Use YYYY-MM-DD.
+2025-04-18 03:10:30.139 | ERROR    | conversations.statistics_conversation:select_period:136 - Failed to generate statistics: expected str, bytes or os.PathLike object, not NoneType
+2025-04-18 03:12:01.391 | ERROR    | statistics_web.generate_web_data:get_statistics_data:84 - Invalid start_date format. Use YYYY-MM-DD.
+2025-04-18 03:12:01.391 | ERROR    | conversations.statistics_conversation:select_period:136 - Failed to generate statistics: expected str, bytes or os.PathLike object, not NoneType
+2025-04-18 03:13:14.962 | ERROR    | conversations.statistics_conversation:select_period:136 - Failed to generate statistics: 'dict' object has no attribute 'suffix'
+2025-04-18 03:19:00.344 | ERROR    | capture_statistics_image:generate_statistics_image:154 - Error generating statistics: write() argument must be str, not PosixPath
+2025-04-18 03:19:00.345 | ERROR    | capture_statistics_image:generate_statistics_image:156 - Traceback (most recent call last):
+  File "/home/yuk0/Development/islob_bot/capture_statistics_image.py", line 142, in generate_statistics_image
+    f.write(html_content)
+TypeError: write() argument must be str, not PosixPath
+
+2025-04-18 03:19:00.345 | ERROR    | conversations.statistics_conversation:select_period:136 - Failed to generate statistics: expected str, bytes or os.PathLike object, not NoneType
+2025-04-18 03:26:02.895 | ERROR    | capture_statistics_image:analyze_metrics_with_assistant:157 - Error during OpenAI analysis: Object of type Decimal is not JSON serializable

@@ -25,7 +25,10 @@ from utils.db_utils import (
 )
 from utils.keyboards import main_menu_keyboard
 from utils.commands import cancel
+from utils.logger import get_logger
 import re
+
+logger = get_logger(__name__)
 
 
 class MorningQuizConversation(Enum):
@@ -37,19 +40,23 @@ class MorningQuizConversation(Enum):
 
 
 async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} starting morning quiz")
+    
     with next(get_db()) as db_session:
         if is_user_had_morning_quiz_today(
-            chat_id=update.effective_user.id, db_session=db_session
+            chat_id=user_id, db_session=db_session
         ):
+            logger.info(f"User {user_id} already completed morning quiz today")
             await context.bot.send_message(
-                chat_id=update.effective_user.id,
+                chat_id=user_id,
                 text=text_constants.QUIZ_ALREADY_PASSED,
                 reply_markup=main_menu_keyboard(update.effective_chat.id),
             )
             return ConversationHandler.END
 
         await context.bot.send_message(
-            chat_id=update.effective_user.id,
+            chat_id=user_id,
             text=text_constants.HOW_DO_YOU_FEEL,
             reply_markup=keyboards.default_one_to_ten_keyboard(),
         )
@@ -57,7 +64,9 @@ async def start_morning_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     input_text = update.message.text
+    logger.info(f"User {user_id} answered first question: {input_text}")
     if not input_text.isnumeric() or not (1 <= int(input_text) <= 10):
         await update.message.reply_text(
             text=text_constants.HOW_DO_YOU_FEEL_EXPLAINED,
@@ -76,8 +85,9 @@ async def retrieve_morning_feelings(update: Update, context: ContextTypes.DEFAUL
 async def retrieve_morning_sleep_hours(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
+    user_id = update.effective_user.id
     input_text = update.message.text
-
+    logger.info(f"User {user_id} answered second question: {input_text}")
     if not isinstance(input_text, str):
         await update.message.reply_text(
             text=text_constants.HOW_MUCH_SLEEP,
@@ -109,7 +119,9 @@ async def retrieve_morning_sleep_hours(
 
 
 async def retrieve_user_weight(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     input_text = update.message.text
+    logger.info(f"User {user_id} answered weight question: {input_text}")
     weight = re.findall(r"[\d.,]+", input_text)
     if not weight:
         await update.message.reply_text(
@@ -132,8 +144,9 @@ async def retrieve_user_weight(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def retrieve_morning_is_going_to_have_training(update, context):
+    user_id = update.effective_user.id
     user_input = update.message.text
-
+    logger.info(f"User {user_id} answered training question: {user_input}")
     if user_input not in text_constants.YES_NO_BUTTONS:
         await update.message.reply_text(
             text=text_constants.IS_GOING_TO_TRAIN,
@@ -167,12 +180,14 @@ async def retrieve_morning_is_going_to_have_training(update, context):
             ),
             reply_markup=main_menu_keyboard(update.effective_chat.id),
         )
+        logger.info(f"User {user_id} completed morning quiz")
         return ConversationHandler.END
 
 
 async def retrieve_morning_training_time(update, context):
+    user_id = update.effective_user.id
     user_input = update.message.text
-
+    logger.info(f"User {user_id} answered training time question: {user_input}")
     if not is_valid_time(user_input):
         await update.message.reply_text(
             text=text_constants.WHEN_GOING_TO_TRAIN,
@@ -213,6 +228,7 @@ async def retrieve_morning_training_time(update, context):
         ),
         reply_markup=main_menu_keyboard(update.effective_chat.id),
     )
+    logger.info(f"User {user_id} completed morning quiz with training")
     return ConversationHandler.END
 
 

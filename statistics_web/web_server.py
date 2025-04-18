@@ -4,32 +4,24 @@ import json
 import http.server
 import socketserver
 import decimal
-import logging
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("statistics_web_server")
 
 # Add the parent directory to sys.path to import modules from the main project
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import our data generation module
+# Import our modules
+from utils.logger import get_logger
 from generate_web_data import get_statistics_data, generate_data_file, generate_html_from_data
+
+# Configure logger
+logger = get_logger(__name__)
 
 # Define the port to run the server on
 PORT = 8000
 
 # Get the directory of this script
 BASE_DIR = Path(__file__).parent
-
 
 # Custom JSON encoder to handle Decimal objects
 class DecimalEncoder(json.JSONEncoder):
@@ -113,7 +105,7 @@ class StatisticsHandler(http.server.SimpleHTTPRequestHandler):
             logger.debug(f"Served API data, size: {len(json_data)} bytes")
             
         except Exception as e:
-            logger.error(f"Error serving stats API: {str(e)}", exc_info=True)
+            logger.exception(f"Error serving stats API: {str(e)}")
             self.send_error(500, str(e))
     
     def serve_stats_page(self, query_params):
@@ -151,7 +143,7 @@ class StatisticsHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(404, error_msg)
                 
         except Exception as e:
-            logger.error(f"Error serving stats page: {str(e)}", exc_info=True)
+            logger.exception(f"Error serving stats page: {str(e)}")
             self.send_error(500, str(e))
 
 
@@ -164,18 +156,21 @@ def run_server():
     
     # Create the server
     with socketserver.TCPServer(("", PORT), handler) as httpd:
-        print(f"Server running at http://localhost:{PORT}")
-        print(f"Available endpoints:")
-        print(f"  - http://localhost:{PORT}/ - Main page")
-        print(f"  - http://localhost:{PORT}/stats.html?user_id=7&period=weekly - Generated statistics page (weekly)")
-        print(f"  - http://localhost:{PORT}/stats.html?user_id=7&start_date=2025-03-01&end_date=2025-03-30 - Custom date range")
-        print(f"  - http://localhost:{PORT}/api/stats?user_id=7&period=monthly - JSON API endpoint (monthly)")
-        print(f"  - http://localhost:{PORT}/api/stats?user_id=7&start_date=2025-03-01&end_date=2025-03-30 - JSON API with custom dates")
-        print(f"Press Ctrl+C to stop the server")
+        server_url = f"http://localhost:{PORT}"
+        logger.info(f"Server running at {server_url}")
+        print(f"Server running at {server_url}")
+        print("Available endpoints:")
+        print(f"  - {server_url}/ - Main page")
+        print(f"  - {server_url}/stats.html?user_id=7&period=weekly - Generated statistics page (weekly)")
+        print(f"  - {server_url}/stats.html?user_id=7&start_date=2025-03-01&end_date=2025-03-30 - Custom date range")
+        print(f"  - {server_url}/api/stats?user_id=7&period=monthly - JSON API endpoint (monthly)")
+        print(f"  - {server_url}/api/stats?user_id=7&start_date=2025-03-01&end_date=2025-03-30 - JSON API with custom dates")
+        print("Press Ctrl+C to stop the server")
         
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
+            logger.info("Server stopped")
             print("\nServer stopped")
 
 

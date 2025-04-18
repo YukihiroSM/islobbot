@@ -1,5 +1,4 @@
 from enum import Enum as PyEnum
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -13,8 +12,9 @@ from sqlalchemy import (
     Float,
 )
 from sqlalchemy.orm import relationship
-
 from database import Base
+from datetime import datetime
+from dateutil import tz
 
 
 class UserRole(PyEnum):
@@ -56,6 +56,27 @@ class NotificationPreference(Base):
     user = relationship("User", back_populates="notification_preferences")
 
 
+class CustomNotification(Base):
+    __tablename__ = "custom_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    notification_name = Column(String, nullable=False)
+    notification_message = Column(String, nullable=False)
+    notification_time = Column(Time, nullable=False)
+    next_execution_datetime = Column(DateTime(timezone=True), nullable=True)
+    last_execution_datetime = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True)
+    notification_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.now())
+    
+    # Periodicity fields
+    periodicity_type = Column(String, nullable=False, default="daily")  # daily, weekly, monthly, specific_days
+    specific_days = Column(String, nullable=True)  # Comma-separated days of week (0-6, where 0 is Monday)
+    
+    user = relationship("User", back_populates="custom_notifications")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -71,6 +92,13 @@ class User(Base):
 
     notification_preferences = relationship(
         "NotificationPreference",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=True,
+    )
+
+    custom_notifications = relationship(
+        "CustomNotification",
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=True,

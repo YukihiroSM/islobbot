@@ -1,4 +1,3 @@
-import logging
 from enum import Enum, auto
 from telegram.ext import (
     CommandHandler,
@@ -21,6 +20,9 @@ from utils.db_utils import (
 )
 from utils.commands import cancel
 from utils.menus import training_menu, main_menu
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TrainingFinishQuiz(Enum):
@@ -29,14 +31,20 @@ class TrainingFinishQuiz(Enum):
 
 
 async def handle_training_stop(update, context):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} attempting to stop training")
+    
     if "training_id" not in context.user_data:
+        logger.warning(f"User {user_id} tried to stop training without an active training session")
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=text_constants.TRAINING_START_GONE_WRONG,
         )
         await training_menu(update, context)
         return
+        
     context.user_data["menu_state"] = "training_stopped"
+    logger.debug(f"User {user_id} training stopped, asking for hardness mark")
     await update.message.reply_text(
         text=text_constants.TRAINING_STOPPED,
         reply_markup=keyboards.training_first_question_marks_keyboard(),
@@ -45,8 +53,12 @@ async def handle_training_stop(update, context):
 
 
 async def handle_training_second_question(update, context):
+    user_id = update.effective_user.id
     user_input = update.message.text
+    logger.debug(f"User {user_id} provided hardness mark: {user_input}")
+    
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        logger.warning(f"User {user_id} provided invalid hardness mark: {user_input}")
         await update.message.reply_text(
             text=text_constants.TRAINING_HARDNESS_MARK,
             reply_markup=keyboards.training_first_question_marks_keyboard(),
@@ -62,10 +74,11 @@ async def handle_training_second_question(update, context):
 
 
 async def handle_training_finish(update, context):
-    logging.info("Inside handle_training_finish")
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} attempting to finish training")
     user_input = update.message.text
     if user_input not in text_constants.YES_NO_BUTTONS:
-        logging.info("Incorrect input")
+        logger.warning(f"User {user_id} provided invalid input: {user_input}")
         context.user_data["menu_state"] = "training_stopped_second_question"
         await update.message.reply_text(
             text=text_constants.HAVE_PAINS,

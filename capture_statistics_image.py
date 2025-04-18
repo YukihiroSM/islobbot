@@ -6,27 +6,33 @@ and then captures it as a PNG image.
 """
 
 import argparse
-import logging
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
+import json
 
 import matplotlib
 matplotlib.use('Agg')
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger('capture_statistics_image')
 
 # Add parent directory to path to import modules
 sys.path.append(str(Path(__file__).parent))
 
 # Import after path setup
 from statistics_web.generate_web_data import generate_html_from_data, get_statistics_data
+from utils.logger import get_logger
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure logger
+logger = get_logger(__name__)
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+ASSISTANT_ID = os.environ.get("OPENAI_ASSISTANT_ID")
 
 # Import Selenium components
 from selenium import webdriver
@@ -93,43 +99,157 @@ def capture_html_screenshot(html_file, output_path, window_width=1200, window_he
         driver.quit()
 
 
+def analyze_metrics_with_assistant(stats_data, user_name):
+    """
+    Analyze metrics using OpenAI Assistant and return text analysis.
+    
+    Args:
+        stats_data (dict): Statistics data dictionary
+        user_name (str): User's name
+        
+    Returns:
+        str: Text analysis from the assistant
+    """
+    logger.info("Analyzing metrics with OpenAI Assistant...")
+    
+    if not ASSISTANT_ID:
+        error_msg = "Error: OPENAI_ASSISTANT_ID not found in environment variables"
+        logger.error(error_msg)
+        return error_msg
+    
+    try:
+        # Create a custom JSON encoder to handle Decimal objects
+        class DecimalEncoder(json.JSONEncoder):
+            def default(self, obj):
+                import decimal
+                if isinstance(obj, decimal.Decimal):
+                    return float(obj)
+                return super(DecimalEncoder, self).default(obj)
+        
+        # Convert stats_data to JSON string for the assistant using the custom encoder
+        metrics_json = json.dumps(stats_data, indent=2, ensure_ascii=False, cls=DecimalEncoder)
+        
+        # Create a thread
+        thread = client.beta.threads.create()
+        
+        # Add a message to the thread
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=f"Будь ласка, проаналізуй ці фітнес-метрики та надай висновки щодо тренувальних звичок користувача, якості сну, рівня стресу та загального прогресу. Ось метрики:\n\n user_full_name: {user_name}\n{metrics_json}",
+        )
+        
+        # Run the assistant
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id, assistant_id=ASSISTANT_ID
+        )
+        
+        # Wait for the analysis to complete
+        while run.status in ["queued", "in_progress"]:
+            logger.debug(f"Assistant run status: {run.status}")
+            time.sleep(1)
+            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+        
+        if run.status == "completed":
+            messages = client.beta.threads.messages.list(thread_id=thread.id)
+            analysis = messages.data[0].content[0].text.value
+            logger.info(f"Received analysis from assistant: {analysis[:100]}...")
+            return analysis
+        else:
+            error_msg = f"Error during analysis. Run status: {run.status}"
+            logger.error(error_msg)
+            return error_msg
+    
+    except Exception as e:
+        error_msg = f"Error during OpenAI analysis: {str(e)}"
+        logger.error(error_msg)
+        import traceback
+        logger.error(traceback.format_exc())
+        return error_msg
+
+
 def generate_statistics_image(chat_id, period='monthly', start_date=None, end_date=None, output_dir=None):
     """
     Generate a statistics image for a user
     
     Args:
         chat_id (int): User's chat ID
-        period (str): Period type (daily, weekly, monthly)
-        start_date (str): Start date in YYYY-MM-DD format
-        end_date (str): End date in YYYY-MM-DD format
-        output_dir (str): Directory to save the output files
-        
+        period (str): Time period for statistics ('weekly' or 'monthly')
+        start_date (datetime): Optional start date for custom period
+        end_date (datetime): Optional end date for custom period
+        output_dir (str): Optional output directory for the image
+    
     Returns:
-        str: Path to the generated image
+        tuple: (Path to the generated image file, Analysis text from OpenAI Assistant)
     """
-    logger.info(f"Generating statistics image for chat_id={chat_id}, period={period}, start_date={start_date}, end_date={end_date}")
+    logger.info(f"Generating statistics image for user {chat_id}, period: {period}")
     
-    # Set default output directory if not provided
     if output_dir is None:
-        output_dir = Path(__file__).parent / "temp"
-        os.makedirs(output_dir, exist_ok=True)
-    else:
-        output_dir = Path(output_dir)
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statistics_web/static/images')
+    os.makedirs(output_dir, exist_ok=True)
     
-    # Generate filenames with user ID
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    html_file = output_dir / f"stats_{chat_id}_{timestamp}.html"
-    image_file = output_dir / f"stats_{chat_id}_{timestamp}.png"
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"stats_{chat_id}_{period}_{timestamp}.png"
+    output_path = os.path.join(output_dir, filename)
     
-    # Generate HTML from data
-    data_path = get_statistics_data(chat_id, period, start_date, end_date)
-    generate_html_from_data(data_path, output_path=html_file, for_image=True)
-    
-    # Capture screenshot
-    output_path = capture_html_screenshot(html_file, image_file)
-    
-    return output_path
+    try:
+        # Get statistics data
+        stats_data = get_statistics_data(
+            user_id=chat_id, 
+            period=period, 
+            start_date=start_date, 
+            end_date=end_date
+        )
+        if "error" in stats_data:
+            logger.error(f"Error getting statistics data: {stats_data['error']}")
+            return None, None
+        
+        # Generate AI analysis of the statistics
+        user_name = stats_data.get('user', {}).get('name', f"User {chat_id}")
+        analysis = analyze_metrics_with_assistant(stats_data, user_name)
+        
+        # Generate HTML directly from the data dictionary
+        temp_html = os.path.join(output_dir, f"temp_{chat_id}.html")
+        template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'statistics_web/template.html')
+        
+        # Pass the dictionary directly to generate_html_from_data
+        html_content = generate_html_from_data(
+            data_path=stats_data,
+            template_path=template_path,
+            output_path=None,
+            for_image=True
+        )
+        
+        # Check if html_content is a PosixPath or string
+        if not isinstance(html_content, str):
+            logger.debug(f"html_content is not a string, it's a {type(html_content)}")
+            # If it's a path, read the content from the file
+            if hasattr(html_content, 'read_text'):
+                html_content = html_content.read_text()
+            elif hasattr(html_content, 'read'):
+                with open(html_content, 'r') as f:
+                    html_content = f.read()
+            else:
+                raise TypeError(f"Expected html_content to be a string or path, got {type(html_content)}")
+        
+        # Save HTML to temp file
+        with open(temp_html, 'w') as f:
+            f.write(html_content)
+        
+        # Capture screenshot
+        capture_html_screenshot(temp_html, output_path)
+        
+        # Clean up temp file
+        os.remove(temp_html)
+        
+        logger.info(f"Generated statistics image at: {output_path}")
+        return output_path, analysis
+        
+    except Exception as e:
+        logger.error(f"Error generating statistics: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None, None
 
 
 def main():
@@ -159,7 +279,7 @@ def main():
         print(f"Statistics image saved to: {output_path}")
     else:
         # Use the function with directory
-        output_path = generate_statistics_image(
+        output_path, analysis = generate_statistics_image(
             args.chat_id, 
             args.period, 
             args.start_date, 
@@ -167,6 +287,7 @@ def main():
             args.output_dir
         )
         print(f"Statistics image saved to: {output_path}")
+        print(f"Analysis: {analysis}")
 
 
 if __name__ == "__main__":

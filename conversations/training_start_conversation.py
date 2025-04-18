@@ -17,6 +17,9 @@ from utils.db_utils import (
 )
 from utils.commands import cancel
 from utils.menus import training_menu
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TrainingStartQuiz(Enum):
@@ -24,6 +27,8 @@ class TrainingStartQuiz(Enum):
 
 
 async def handle_training_startup(update, context):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} starting training")
     context.user_data["menu_state"] = "training_start"
     await update.message.reply_text(
         text=text_constants.TRAINING_START,
@@ -33,21 +38,31 @@ async def handle_training_startup(update, context):
 
 
 async def handle_training_timer_start(update, context):
+    user_id = update.effective_user.id
     user_input = update.message.text
+    logger.debug(f"User {user_id} training start input: {user_input}")
+    
     if user_input not in text_constants.ONE_TO_TEN_MARKS:
+        logger.warning(f"User {user_id} provided invalid mark: {user_input}")
         await update.message.reply_text(
             text_constants.PRE_TRAINING_FEELINGS,
             reply_markup=keyboards.training_first_question_marks_keyboard(),
         )
         return TrainingStartQuiz.FIRST_QUESTION_ANSWER
+        
     context.user_data["menu_state"] = "training_start_timer_start"
+    logger.info(f"User {user_id} starting training with mark: {user_input}")
+    
     with next(get_db()) as db_session:
         training_id = start_user_training(
             chat_id=update.effective_chat.id,
             user_state_mark=user_input,
             db_session=db_session,
         )
+        logger.debug(f"Created training with ID: {training_id}")
+        
     if not training_id:
+        logger.error(f"Failed to create training for user {user_id}")
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=text_constants.TRAINING_START_GONE_WRONG,

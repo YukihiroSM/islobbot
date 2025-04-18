@@ -3,19 +3,8 @@ import sys
 import json
 import datetime
 import decimal
-import pandas as pd
-import logging
 from pathlib import Path
-
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("statistics_web")
+import pandas as pd
 
 # Add the parent directory to sys.path to import modules from the main project
 sys.path.append(str(Path(__file__).parent.parent))
@@ -23,7 +12,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 from database import get_db
 from models import User
 from statistics_3 import BaseStatisticsRecord, WeeklyStatisticsRecord, MonthlyStatisticsRecord
+from utils.logger import get_logger
 
+# Configure logger
+logger = get_logger(__name__)
 
 # Custom JSON encoder to handle Decimal objects
 class DecimalEncoder(json.JSONEncoder):
@@ -47,15 +39,23 @@ def prepare_chart_data(df, value_column):
     Convert DataFrame with dt and value columns to chart-friendly format
     Returns a dict with dates and values arrays
     """
+    if not isinstance(df, pd.DataFrame):
+        logger.warning(f"Expected pandas DataFrame, got {type(df)}")
+        return {"dates": [], "values": []}
+        
     if df.empty:
         return {"dates": [], "values": []}
     
-    # Sort by date
+    # Sort by date in ascending order
     df = df.sort_values("dt")
     
     # Format dates for display
     dates = [format_date(dt) for dt in df["dt"].tolist()]
     values = df[value_column].tolist()
+    
+    # Reverse the order to show most recent data on the right side
+    dates.reverse()
+    values.reverse()
     
     return {
         "dates": dates,
@@ -79,6 +79,7 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     # Get user information
     user = session.query(User).filter(User.id == user_id).first()
     if not user:
+        logger.error(f"User with ID {user_id} not found")
         return {"error": f"User with ID {user_id} not found"}
     
     user_full_name = user.full_name or f"User {user_id}"
@@ -88,7 +89,8 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
         try:
             start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
         except ValueError:
-            return {"error": f"Invalid start_date format. Use YYYY-MM-DD."}
+            logger.error("Invalid start_date format. Use YYYY-MM-DD.")
+            return {"error": "Invalid start_date format. Use YYYY-MM-DD."}
     
     if isinstance(end_date, str):
         try:
@@ -96,25 +98,30 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
             # Set to end of day
             end_date = end_date.replace(hour=23, minute=59, second=59)
         except ValueError:
-            return {"error": f"Invalid end_date format. Use YYYY-MM-DD."}
+            logger.error("Invalid end_date format. Use YYYY-MM-DD.")
+            return {"error": "Invalid end_date format. Use YYYY-MM-DD."}
     
     # Create appropriate statistics record based on input
     if start_date and end_date:
-        # Custom date range
+        logger.info(f"Creating custom date range statistics for user {user_id} from {start_date} to {end_date}")
         stats = BaseStatisticsRecord(session, user_id, start_date, end_date, user_full_name)
         period_type = "custom"
     elif period:
         # Predefined period
         if period.lower() == "weekly":
+            logger.info(f"Creating weekly statistics for user {user_id}")
             stats = WeeklyStatisticsRecord(session, user_id, user_full_name=user_full_name)
             period_type = "weekly"
         elif period.lower() == "monthly":
+            logger.info(f"Creating monthly statistics for user {user_id}")
             stats = MonthlyStatisticsRecord(session, user_id, user_full_name=user_full_name)
             period_type = "monthly"
         else:
+            logger.error(f"Invalid period: {period}. Use 'weekly' or 'monthly'.")
             return {"error": f"Invalid period: {period}. Use 'weekly' or 'monthly'."}
     else:
         # Default to weekly if no dates or period specified
+        logger.info(f"Creating weekly statistics for user {user_id}")
         stats = WeeklyStatisticsRecord(session, user_id, user_full_name=user_full_name)
         period_type = "weekly"
     
@@ -158,6 +165,9 @@ def get_statistics_data(user_id, start_date=None, end_date=None, period=None):
     
     # Sort the dates
     all_dates = sorted(list(all_dates))
+    
+    # Reverse the dates to show most recent data on the right
+    all_dates.reverse()
     
     # Create arrays with values for each date, using null for missing values
     stress_values = []
@@ -261,6 +271,7 @@ def generate_data_file(user_id, start_date=None, end_date=None, period=None, out
     - period: Predefined period ("weekly", "monthly") - only used if start_date and end_date are None
     - output_path: Path to save the output file (default: data.js in current directory)
     """
+    logger.info(f"Generating data file for user {user_id}")
     data = get_statistics_data(user_id, start_date, end_date, period)
     
     if "error" in data:
@@ -323,36 +334,50 @@ def generate_html_from_data(data_path, template_path=None, output_path=None, for
     Generate HTML file from data using Jinja2 templating
     
     Parameters:
-    - data_path: Path to the data file (.js or .json)
+    - data_path: Path to the data file (.js or .json) or a dictionary containing the data directly
     - template_path: Path to the template file (default: template.html)
     - output_path: Path to save the output HTML file (default: stats.html)
     - for_image: If True, use a different output path (stats_image.html)
+    
+    Returns:
+    - If output_path is provided: Path to the generated HTML file
+    - If output_path is None: HTML content as a string
     """
     import json
     import os
-    import logging
     from pathlib import Path
     from jinja2 import Environment, FileSystemLoader
 
-    logger = logging.getLogger("statistics_web")
+    logger = get_logger(__name__)
 
     # Load data
     base_dir = Path(__file__).parent
     
-    if isinstance(data_path, str):
-        data_path = Path(data_path)
-    
-    if data_path.suffix == '.js':
-        # If data_path is a .js file, convert to .json path
-        json_path = data_path.with_suffix('.json')
-        logger.info(f"Using JSON data from: {json_path}")
-        with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+    # Check if data_path is already a dictionary (direct data)
+    if isinstance(data_path, dict):
+        logger.info("Using provided dictionary data directly")
+        data = data_path
     else:
-        # Assume it's a .json file
-        logger.info(f"Using JSON data from: {data_path}")
-        with open(data_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        # Handle file paths
+        if isinstance(data_path, str):
+            data_path = Path(data_path)
+        logger.debug(f"DATA PATH: {data_path}")
+        
+        try:
+            if data_path.suffix == '.js':
+                # If data_path is a .js file, convert to .json path
+                json_path = data_path.with_suffix('.json')
+                logger.info(f"Using JSON data from: {json_path}")
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                # Assume it's a .json file
+                logger.info(f"Using JSON data from: {data_path}")
+                with open(data_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+        except AttributeError:
+            logger.error(f"Invalid data path: {data_path}")
+            raise ValueError(f"Data path must be a Path object, string path, or dictionary. Got: {type(data_path)}")
     
     # Set default paths if not provided
     if template_path is None:
@@ -462,21 +487,24 @@ def generate_html_from_data(data_path, template_path=None, output_path=None, for
         logger.error("HTML does NOT contain 'const sampleData' declaration - this is a problem!")
     
     # Write output file
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    
-    logger.info(f"Generated HTML file at: {output_path}")
-    
-    # Also write a debug copy with line numbers
-    debug_output_path = str(output_path).replace(".html", "_debug.html")
-    with open(debug_output_path, "w", encoding="utf-8") as f:
-        lines = html_content.split("\n")
-        for i, line in enumerate(lines):
-            f.write(f"{i+1:04d}: {line}\n")
-    
-    logger.info(f"Generated debug HTML file with line numbers at: {debug_output_path}")
-    
-    return output_path
+    if output_path:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        
+        logger.info(f"Generated HTML file at: {output_path}")
+        
+        # Also write a debug copy with line numbers
+        debug_output_path = str(output_path).replace(".html", "_debug.html")
+        with open(debug_output_path, "w", encoding="utf-8") as f:
+            lines = html_content.split("\n")
+            for i, line in enumerate(lines):
+                f.write(f"{i+1:04d}: {line}\n")
+        
+        logger.info(f"Generated debug HTML file with line numbers at: {debug_output_path}")
+        
+        return html_content
+    else:
+        return html_content
 
 
 def inspect_charts_js_compatibility():

@@ -20,6 +20,9 @@ from utils.db_utils import (
 from utils.keyboards import main_menu_keyboard
 from utils.commands import cancel, start
 from models import NotificationType
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class IntroConversation(Enum):
@@ -29,11 +32,16 @@ class IntroConversation(Enum):
 
 
 async def get_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     name = update.message.text
+    logger.info(f"User {user_id} provided name: {name}")
+    
     with next(get_db()) as db_session:
         update_user_full_name(
-            chat_id=update.effective_chat.id, full_name=name, db=db_session
+            chat_id=user_id, full_name=name, db=db_session
         )
+        logger.debug(f"Updated user {user_id} full name to: {name}")
+        
         await update.message.reply_text(
             text=text_constants.INTRO_CONVERSATION_FIRST_MEET.format(name=name)
         )
@@ -43,10 +51,14 @@ async def get_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_morning_notification_time(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
+    user_id = update.effective_user.id
     time_input = update.message.text
+    logger.info(f"User {user_id} provided morning notification time: {time_input}")
+    
     if is_valid_morning_time(time_input):
         with next(get_db()) as db_session:
             hours, minutes = map(int, time_input.split(":")[:2])
+            logger.debug(f"Parsed time for user {user_id}: {hours}:{minutes}")
 
             datetime_now = datetime.now(tz=timezone)
             datetime_time_input = timezone.localize(
