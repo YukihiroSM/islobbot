@@ -36,10 +36,9 @@ async def capture_statistics_image(stats_data, output_path=None, template_name="
     async with async_playwright() as p:
         # Launch browser in headless mode
         browser = await p.chromium.launch(
-    args=["--no-sandbox", "--disable-setuid-sandbox"],
-    headless=True
-)
-        browser = await p.chromium.launch(headless=True)
+            args=["--no-sandbox", "--disable-setuid-sandbox"],
+            headless=True
+        )
         
         # Create a new page
         page = await browser.new_page(viewport={"width": 1200, "height": 1600})
