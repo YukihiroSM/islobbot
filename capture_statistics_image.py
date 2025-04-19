@@ -9,7 +9,6 @@ from datetime import datetime
 import time
 import argparse
 import decimal
-import subprocess
 
 from loguru import logger
 
@@ -78,61 +77,40 @@ async def capture_html_screenshot(html_file, output_path, window_width=1200, win
         if os.environ.get("DYNO"):
             logger.info("Running on Heroku, using alternative screenshot method")
             
-            # On Heroku, we'll use our Playwright-based approach with a placeholder
-            # Create a simple HTML file with a message
-            placeholder_html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        display: flex; 
-                        justify-content: center; 
-                        align-items: center; 
-                        height: 100vh; 
-                        background-color: #f0f0f0;
-                    }
-                    .message { 
-                        text-align: center; 
-                        padding: 20px; 
-                        background: white; 
-                        border-radius: 10px;
-                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="message">
-                    <h2>Statistics Image</h2>
-                    <p>Your statistics are being processed.</p>
-                    <p>Please check back later.</p>
-                </div>
-            </body>
-            </html>
-            """
-            
-            # Write the placeholder HTML to a temporary file
-            temp_html = os.path.join(os.path.dirname(output_path), "placeholder.html")
-            with open(temp_html, "w") as f:
-                f.write(placeholder_html)
-                
-            # Use Playwright to capture the placeholder
+            # On Heroku, ensure browsers are installed
             try:
-                # Create an empty dictionary for the placeholder
-                return await capture_statistics_image({}, output_path, temp_html)
-            except Exception as e:
-                logger.error(f"Failed to capture placeholder with Playwright: {e}")
+                import subprocess
+                logger.info("Checking if Playwright browsers are installed...")
+                # Check if the browser executable exists
+                browser_path = "/app/.heroku/python/lib/python3.13/site-packages/playwright/driver/package/.local-browsers/chromium_headless_shell-1161/chrome-linux/headless_shell"
                 
-                # If all else fails, copy a static placeholder image
-                placeholder_path = os.path.join(os.path.dirname(__file__), "statistics_web", "placeholder.png")
-                if os.path.exists(placeholder_path):
-                    import shutil
-                    shutil.copy(placeholder_path, output_path)
-                    return output_path
+                if not os.path.exists(browser_path):
+                    logger.warning("Playwright browser not found, attempting to install...")
+                    # Try to install browsers
+                    subprocess.run(["python", "-m", "playwright", "install", "chromium", "--with-deps"], check=True)
+                    logger.info("Playwright browser installation completed")
                 else:
-                    logger.error("Placeholder image not found")
-                    return None
+                    logger.info("Playwright browser is already installed")
+            except Exception as e:
+                logger.error(f"Failed to install Playwright browsers: {e}")
+            
+            # Try to use Playwright with the installed browser
+            try:
+                logger.info("Using Playwright to capture screenshot on Heroku")
+                return await capture_statistics_image(stats_data, output_path, template_name="template.html")
+            except Exception as e:
+                logger.error(f"Error capturing screenshot with Playwright on Heroku: {e}")
+                
+            # Fallback to a static placeholder image
+            logger.warning("Using fallback method for capturing screenshot")
+            placeholder_path = os.path.join(os.path.dirname(__file__), "statistics_web", "placeholder.png")
+            if os.path.exists(placeholder_path):
+                import shutil
+                shutil.copy(placeholder_path, output_path)
+                return output_path
+            else:
+                logger.error("Placeholder image not found")
+                return None
         
         # If not on Heroku, try to use wkhtmltoimage
         try:
@@ -272,8 +250,7 @@ async def generate_statistics_image(chat_id, period='monthly', start_date=None, 
             return None, None
         
         # Generate AI analysis of the statistics
-        user_name = stats_data.get('user', {}).get('name', f"User {chat_id}")
-        # analysis = await analyze_metrics_with_assistant(stats_data, user_name)
+        # analysis = await analyze_metrics_with_assistant(stats_data, stats_data.get('user', {}).get('name', f"User {chat_id}"))
         analysis = "TESDT"
         
         # Generate HTML directly from the data dictionary
