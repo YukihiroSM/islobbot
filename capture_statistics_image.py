@@ -250,8 +250,7 @@ async def generate_statistics_image(chat_id, period='monthly', start_date=None, 
             return None, None
         
         # Generate AI analysis of the statistics
-        # analysis = await analyze_metrics_with_assistant(stats_data, stats_data.get('user', {}).get('name', f"User {chat_id}"))
-        analysis = "TESDT"
+        analysis = await analyze_metrics_with_assistant(stats_data, stats_data.get('user', {}).get('name', f"User {chat_id}"))
         
         # Generate HTML directly from the data dictionary
         temp_html = os.path.join(output_dir, f"temp_{chat_id}.html")
