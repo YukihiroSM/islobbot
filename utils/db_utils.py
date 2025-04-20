@@ -944,3 +944,38 @@ def toggle_user_notification(notification_id: int, db_session: Session):
     notification.is_active = not notification.is_active
     db_session.commit()
     logger.info(f"Toggled notification {notification_id} to {notification.is_active}")
+
+
+def update_user_stats_counter(user_id: int, db_session: Session):
+    """
+    Update the weekly statistics counter for a user and return whether this is a monthly stats cycle.
+    
+    Args:
+        user_id (int): The user ID
+        db_session (Session): Database session
+        
+    Returns:
+        tuple: (is_monthly, counter) - Whether this is a monthly stats cycle and the current counter value
+    """
+    user = db_session.query(User).filter_by(id=user_id).first()
+    if not user:
+        logger.error(f"User not found with id={user_id}")
+        return False, 0
+        
+    # Increment the counter (handle case where field doesn't exist in DB yet)
+    if user.weekly_stats_counter is None:
+        user.weekly_stats_counter = 1
+    else:
+        user.weekly_stats_counter += 1
+    counter = user.weekly_stats_counter
+    
+    # Update the last sent date
+    user.last_stats_sent_date = datetime.datetime.now(tz=tz)
+    
+    # Determine if this is a monthly stats cycle (every 4th time)
+    is_monthly = counter % 4 == 0
+    
+    db_session.commit()
+    logger.info(f"Updated stats counter for user {user_id} to {counter}, is_monthly={is_monthly}")
+    
+    return is_monthly, counter

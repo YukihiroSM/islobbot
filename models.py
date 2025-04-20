@@ -14,7 +14,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
-from dateutil import tz
 
 
 class UserRole(PyEnum):
@@ -89,6 +88,9 @@ class User(Base):
     )
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER)
     training_pdf_message_id = Column(String, default=None, nullable=True)
+    is_active = Column(Boolean, default=True)
+    weekly_stats_counter = Column(Integer, default=0)
+    last_stats_sent_date = Column(DateTime, nullable=True)
 
     notification_preferences = relationship(
         "NotificationPreference",

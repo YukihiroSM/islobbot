@@ -25,11 +25,13 @@ from utils.db_utils import (
     update_user_notification_preference_next_execution,
     get_custom_notifications_to_send,
     update_custom_notification_sent,
+    update_user_stats_counter,
 )
-from models import NotificationType, CustomNotification
+from models import NotificationType, CustomNotification, User
 import utils.menus
 import text_constants
 from utils.logger import get_logger
+from capture_statistics_image import generate_statistics_image
 
 logger = get_logger(__name__)
 
@@ -283,6 +285,122 @@ async def stop_training_notification(context):
     for notification in notifications:
         await send_stop_training_notifications(context, notification)
 
+async def send_weekly_statistics(context: CallbackContext):
+    """
+    Schedule individual jobs for each user to generate and send statistics.
+    Every 4th time (4, 8, 12, 16...), send monthly statistics instead.
+    
+    Runs every Monday at 12:00 Kyiv time.
+    """
+    current_date = datetime.datetime.now(tz=timezone)
+    
+    # Since we're using run_daily with days=[0], this check is redundant
+    # but keeping it as an extra safeguard
+    if current_date.weekday() != 0:  # 0 is Monday
+        logger.warning(f"Weekly statistics job ran on non-Monday: {current_date}")
+        return
+    
+    logger.info(f"Running scheduled statistics job at {current_date}")
+    
+    # Get all active users
+    with next(get_db()) as db_session:
+        users = db_session.query(User).filter(User.is_active).all()
+        
+        if not users:
+            logger.warning("No active users found for sending statistics")
+            return
+            
+        logger.info(f"Found {len(users)} active users for sending statistics")
+        
+        # Schedule individual jobs for each user with a small delay between them
+        delay = 0
+        for user in users:
+            # Schedule a job to process this user's statistics
+            # Use a small delay between users to avoid overloading the system
+            context.job_queue.run_once(
+                process_user_statistics,
+                delay,
+                data={"user_id": user.id, "chat_id": user.chat_id}
+            )
+            # Increment delay for the next user (2 seconds between users)
+            delay += 2
+            
+        logger.info(f"Scheduled statistics generation for {len(users)} users")
+
+
+async def process_user_statistics(context: CallbackContext):
+    """Process statistics for a single user"""
+    job_data = context.job.data
+    user_id = job_data["user_id"]
+    chat_id = job_data["chat_id"]
+    
+    try:
+        chat_id = int(chat_id)
+        logger.info(f"Processing statistics for user {chat_id}")
+        
+        # Use a new database session
+        with next(get_db()) as db_session:
+            # Update the user's stats counter and determine if this is a monthly cycle
+            is_monthly, counter = update_user_stats_counter(user_id, db_session)
+            
+            # Set period and date range based on counter
+            period = "monthly" if is_monthly else "weekly"
+            end_date = datetime.datetime.now(tz=timezone)
+            
+            # For weekly stats, use last 7 days; for monthly stats, use last 28 days
+            if is_monthly:
+                start_date = end_date - datetime.timedelta(days=28)
+            else:
+                start_date = end_date - datetime.timedelta(days=7)
+            
+            logger.info(f"Generating {period} statistics for user {chat_id} (counter: {counter})")
+            
+            # Generate statistics image and analysis
+            image_path, analysis = await generate_statistics_image(
+                chat_id=user_id,
+                period=period,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d")
+            )
+            
+            if not image_path:
+                logger.error(f"Failed to generate statistics image for user {chat_id}")
+                return
+            
+            # Determine the period text for the caption
+            period_text = text_constants.LAST_MONTH if is_monthly else text_constants.LAST_WEEK
+            
+            # Send image to user
+            with open(image_path, 'rb') as photo:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=photo,
+                    caption=text_constants.WEEKLY_STATISTICS_CAPTION.format(period=period_text)
+                )
+            
+            # Send AI analysis as a separate message if available
+            if analysis:
+                logger.info(f"Sending AI analysis to user {chat_id}")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"📊 *Аналіз ваших тренувань*\n\n{analysis}",
+                    parse_mode="Markdown"
+                )
+            
+            logger.info(f"Statistics sent successfully to user {chat_id}")
+            
+            # Clean up the image file
+            try:
+                import os
+                os.remove(image_path)
+            except Exception as e:
+                logger.error(f"Error removing temporary file: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error sending statistics to user {chat_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
 if __name__ == "__main__":
     logger.info("Starting ISLOB Bot")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -377,6 +495,11 @@ if __name__ == "__main__":
     
     logger.info("Adding custom notifications job (interval: 10s)")
     job_queue.run_repeating(send_custom_notifications, interval=10, first=0)
+    
+    # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time
+    kyiv_time = datetime_time(hour=12, minute=0, tzinfo=timezone)
+    logger.info(f"Adding weekly statistics job (every Monday at {kyiv_time})")
+    job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[0])  # 0 is Monday
 
     # Configure error handler
     from utils.error_handler import error_handler
