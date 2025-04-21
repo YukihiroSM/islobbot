@@ -294,12 +294,6 @@ async def send_weekly_statistics(context: CallbackContext):
     """
     current_date = datetime.datetime.now(tz=timezone)
     
-    # Since we're using run_daily with days=[0], this check is redundant
-    # but keeping it as an extra safeguard
-    if current_date.weekday() != 0:  # 0 is Monday
-        logger.warning(f"Weekly statistics job ran on non-Monday: {current_date}")
-        return
-    
     logger.info(f"Running scheduled statistics job at {current_date}")
     
     # Get all active users
@@ -497,9 +491,14 @@ if __name__ == "__main__":
     job_queue.run_repeating(send_custom_notifications, interval=10, first=0)
     
     # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time
-    kyiv_time = datetime_time(hour=18, minute=0, tzinfo=timezone)
+    kyiv_time = datetime_time(hour=19, minute=20, tzinfo=timezone)
     logger.info(f"Adding weekly statistics job (every Monday at {kyiv_time})")
     job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[0])  # 0 is Monday
+    #show jobs execution time on startup:
+    current_time = datetime.datetime.now()
+    logger.info("Jobs execution time:")
+    logger.info(f"{send_weekly_statistics.__name__}: {kyiv_time}")
+
 
     # Configure error handler
     from utils.error_handler import error_handler
