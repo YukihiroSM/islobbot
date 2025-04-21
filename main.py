@@ -497,7 +497,7 @@ if __name__ == "__main__":
     job_queue.run_repeating(send_custom_notifications, interval=10, first=0)
     
     # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time
-    kyiv_time = datetime_time(hour=12, minute=0, tzinfo=timezone)
+    kyiv_time = datetime_time(hour=18, minute=0, tzinfo=timezone)
     logger.info(f"Adding weekly statistics job (every Monday at {kyiv_time})")
     job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[0])  # 0 is Monday
 
