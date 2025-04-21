@@ -496,6 +496,7 @@ if __name__ == "__main__":
     job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[0])  # 0 is Monday
     #show jobs execution time on startup:
     current_time = datetime.datetime.now()
+    logger.info(f"Current time: {current_time}")
     logger.info("Jobs execution time:")
     logger.info(f"{send_weekly_statistics.__name__}: {kyiv_time}")
 
