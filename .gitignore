@@ -7,3 +7,5 @@ __pycache__
 venv/
 islob_bot.code-workspace
 logs
+
+statistics_web/static/images/

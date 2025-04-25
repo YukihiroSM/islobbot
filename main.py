@@ -491,9 +491,8 @@ if __name__ == "__main__":
     job_queue.run_repeating(send_custom_notifications, interval=10, first=0)
     
     # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time
-    kyiv_time = datetime_time(hour=16, minute=40, tzinfo=timezone)
-    logger.info(f"Adding weekly statistics job (every Monday at {kyiv_time})")
-    job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[0])  # 0 is Monday
+    kyiv_time = datetime_time(hour=18, minute=20)
+    job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[5])  # 0 is Monday
     #show jobs execution time on startup:
     current_time = datetime.datetime.now()
     logger.info(f"Current time: {current_time}")
