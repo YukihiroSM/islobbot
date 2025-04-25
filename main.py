@@ -490,8 +490,8 @@ if __name__ == "__main__":
     logger.info("Adding custom notifications job (interval: 10s)")
     job_queue.run_repeating(send_custom_notifications, interval=10, first=0)
     
-    # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time
-    kyiv_time = datetime_time(hour=18, minute=20)
+    # Schedule weekly statistics job to run every Monday at 12:00 Kyiv time -> 9:00 UTC time
+    kyiv_time = datetime_time(hour=18, minute=50) #UTC TIME
     job_queue.run_daily(send_weekly_statistics, time=kyiv_time, days=[5])  # 0 is Monday
     #show jobs execution time on startup:
     current_time = datetime.datetime.now()
