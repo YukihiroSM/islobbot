@@ -6,3 +6,5 @@ __pycache__
 .ruff_cache
 venv/
 islob_bot.code-workspace
+logs/
+statistics_web/static/
